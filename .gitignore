@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Lokale Caches (OSM-Abfragen, Höhendaten)
+.cache/
+cache/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code (lokale Einstellungen)
+.claude/

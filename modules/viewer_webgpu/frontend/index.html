@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>TERRA-Sim 3D</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: transparent;
+                 font-family: "Source Sans Pro", "Source Sans 3", system-ui, sans-serif; }
+    #view { position: relative; width: 100%; height: 100%; border-radius: 10px; overflow: hidden;
+            background: linear-gradient(#cfe0ec, #eef2f2); }
+    #view canvas { display: block; width: 100%; height: 100%; outline: none; }
+    #tip { position: absolute; pointer-events: none; display: none; max-width: 280px;
+           background: rgba(20, 33, 40, .92); color: #fff; font-size: 12.5px; line-height: 1.4;
+           padding: 7px 10px; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.25); z-index: 3; }
+    #toolbar { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; z-index: 2; }
+    #toolbar button { border: 1px solid rgba(15, 43, 46, .15); background: rgba(255,255,255,.92);
+                      color: #0f2b2e; border-radius: 6px; padding: 4px 9px; font: inherit; font-size: 12.5px;
+                      cursor: pointer; }
+    #toolbar button:hover { background: #fff; border-color: #0b6e74; color: #0b6e74; }
+    #toolbar button.on { background: #0b6e74; color: #fff; border-color: #0b6e74; }
+    #badge { position: absolute; left: 10px; bottom: 8px; font-size: 11px; color: rgba(15,43,46,.6);
+             background: rgba(255,255,255,.7); padding: 1px 7px; border-radius: 10px; z-index: 2; }
+    #toolbar button:disabled { opacity: .45; cursor: default; }
+    #counter { position: absolute; right: 10px; bottom: 8px; display: none; z-index: 2; font-size: 13px;
+               font-weight: 600; color: #fff; background: rgba(46, 125, 50, .9); padding: 3px 10px;
+               border-radius: 12px; }
+    #compass { position: absolute; left: 12px; top: 10px; width: 38px; height: 38px; z-index: 2;
+               border-radius: 50%; background: rgba(255,255,255,.85); border: 1px solid rgba(15,43,46,.15);
+               cursor: pointer; }
+    #msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+           color: #3d5a5c; font-size: 14px; text-align: center; padding: 20px; z-index: 4; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.webgpu.js",
+      "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.webgpu.js",
+      "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.tsl.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="view">
+    <div id="msg">3D-Ansicht wird geladen …</div>
+    <div id="tip"></div>
+    <svg id="compass" viewBox="-20 -20 40 40" aria-label="Nach Norden ausrichten">
+      <title>Nach Norden ausrichten</title>
+      <g id="needle"><path d="M0,-15 L5,0 L-5,0 Z" fill="#d63031"/><path d="M0,15 L5,0 L-5,0 Z" fill="#9aa5a6"/>
+      <text x="0" y="-5.5" font-size="6" text-anchor="middle" fill="#fff" font-weight="700">N</text></g>
+    </svg>
+    <div id="toolbar">
+      <button id="btn-reset" title="Ausgangsansicht">Ansicht</button>
+      <button id="btn-top" title="Von oben">Draufsicht</button>
+      <button id="btn-nik" title="Auf Nik zoomen und ihm folgen">Nik folgen</button>
+      <button id="btn-people" class="on" title="Menschen anhalten und ausblenden">Menschen</button>
+      <button id="btn-shadow" class="on" title="Schatten und Umgebungsverdeckung">Schatten</button>
+    </div>
+    <div id="badge"></div>
+    <div id="counter"></div>
+  </div>
+  <script>
+    // Fehlermeldung, falls three.js nicht geladen werden kann (z. B. offline)
+    window.addEventListener("error", (e) => {
+      const m = document.getElementById("msg");
+      if (m && m.style.display !== "none") m.textContent = "3D-Ansicht konnte nicht geladen werden: " + (e.message || e);
+    });
+  </script>
+  <script type="module" src="./viewer.js"></script>
+</body>
+</html>
