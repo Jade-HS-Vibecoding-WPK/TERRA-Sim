@@ -609,6 +609,125 @@ def _find_venturi(buildings, geoms, heights, tree, flow_dir, speed, max_gap_m, e
     }, geometry=gap[ok], crs=buildings.crs).reset_index(drop=True)
 
 
+# --------------------------------------------------------------------------
+# Strömungsfeld in Fußgängerhöhe
+# --------------------------------------------------------------------------
+
+PEDESTRIAN_HEIGHT_M = 2.0
+DANGEROUS_WIND_MS = 15.0   # mittlere Windgeschwindigkeit, ab der Gehen gefährlich wird (Lawson)
+
+
+@dataclass
+class WindField:
+    u: np.ndarray            # (ny, nx) Wind nach Osten in Fußgängerhöhe (m/s)
+    v: np.ndarray            # (ny, nx) Wind nach Norden (m/s)
+    speed: np.ndarray        # (ny, nx) Betrag (m/s), 0 in Gebäuden
+    factor: np.ndarray       # (ny, nx) Verhältnis zum freien Wind in gleicher Höhe (1 = wie im Freien)
+    shelter: np.ndarray      # (ny, nx) Windschatten 0..1
+    solid: np.ndarray        # (ny, nx) Gebäude oder ringsum geschlossener Hof
+    kpis: dict
+
+
+def _potential_flow(solid: np.ndarray, ux: float, uy: float, iterations: int = 500,
+                    omega: float = 1.85) -> np.ndarray:
+    """Potentialströmung um die Gebäude: Laplace-Gleichung, Rot-Schwarz-SOR.
+
+    Am Rand des Gebiets strömt die Luft gleichmäßig (φ = U·x); an Gebäuden
+    gibt es keinen Durchfluss (Ableitung null). Rückgabe: Potential φ je Zelle.
+    """
+    ny, nx = solid.shape
+    rows, cols = np.mgrid[0:ny, 0:nx]
+    phi = (ux * cols + uy * rows).astype(float)
+    edge = (rows == 0) | (rows == ny - 1) | (cols == 0) | (cols == nx - 1)
+    update = ~solid & ~edge
+    red, black = update & ((rows + cols) % 2 == 0), update & ((rows + cols) % 2 == 1)
+    pad_solid = np.pad(solid, 1, constant_values=True)
+    blocked = [pad_solid[2:, 1:-1], pad_solid[:-2, 1:-1], pad_solid[1:-1, 2:], pad_solid[1:-1, :-2]]
+    for _ in range(iterations):
+        for mask in (red, black):
+            p = np.pad(phi, 1, mode="edge")
+            neighbours = [p[2:, 1:-1], p[:-2, 1:-1], p[1:-1, 2:], p[1:-1, :-2]]
+            total = sum(np.where(b, phi, n) for n, b in zip(neighbours, blocked))
+            phi = np.where(mask, phi + omega * (total / 4 - phi), phi)
+    return phi
+
+
+def _gradient(phi: np.ndarray, solid: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """∂φ/∂x, ∂φ/∂y in Zellen; an Gebäuden einseitige Differenzen."""
+    def axis_diff(axis):
+        p = np.pad(phi, 1, mode="edge")
+        s = np.pad(solid, 1, constant_values=True)
+        if axis == 1:
+            fwd, bwd, sf, sb = p[1:-1, 2:], p[1:-1, :-2], s[1:-1, 2:], s[1:-1, :-2]
+        else:
+            fwd, bwd, sf, sb = p[2:, 1:-1], p[:-2, 1:-1], s[2:, 1:-1], s[:-2, 1:-1]
+        both = (fwd - bwd) / 2
+        return np.where(~sf & ~sb, both, np.where(~sf, fwd - phi, np.where(~sb, phi - bwd, 0.0)))
+    return axis_diff(1), axis_diff(0)
+
+
+def wind_field(raster: Raster, building_heights: np.ndarray, direction_deg: float, beaufort: float,
+               wake_length: float = 5.0, iterations: int = 500) -> WindField:
+    """Wind am Boden: Umströmung der Gebäude, Düsen in Lücken, Windschatten im Lee.
+
+    1. **Umströmung** als Potentialströmung (keine Luft durch Gebäude, Beschleunigung
+       an Ecken und in Lücken).
+    2. **Windschatten**: hinter einem Gebäude der Höhe H ist der Wind bis etwa
+       ``wake_length`` · H abgeschwächt (direkt dahinter um bis zu 75 %).
+    3. Umrechnung auf **Fußgängerhöhe** (2 m) mit dem Höhenprofil der Stadt.
+
+    ``building_heights``  Höhe je Gebäude (Zeilen wie ``raster.building_idx``)
+    Ergebnis in m/s; geschlossene Innenhöfe gelten als windstill.
+    """
+    building = raster.building_idx >= 0
+    heights = np.where(building, np.asarray(building_heights, float)[np.maximum(raster.building_idx, 0)], 0.0)
+
+    # Höfe ohne Verbindung zum Rand: dort steht die Luft
+    labels, count = ndimage.label(~building)
+    edge_labels = np.unique(np.concatenate([labels[0], labels[-1], labels[:, 0], labels[:, -1]]))
+    solid = building | ~np.isin(labels, edge_labels[edge_labels > 0])
+
+    theta = math.radians(direction_deg)
+    ux, uy = -math.sin(theta), -math.cos(theta)              # Richtung, in die der Wind weht
+    phi = _potential_flow(solid, ux, uy, iterations)
+    gx, gy = _gradient(phi, solid)
+    factor = np.clip(np.hypot(gx, gy), 0, 1.8)      # Ecken-Singularitäten der Potentialströmung begrenzen
+
+    # Windschatten: entgegen der Windrichtung nach Gebäuden suchen
+    shelter = np.zeros_like(factor)
+    if heights.max() > 0:
+        steps = int(min(90, math.ceil(wake_length * heights.max() / raster.cell)))
+        hp = np.pad(heights, steps)
+        ny, nx = heights.shape
+        for d in range(1, steps + 1):
+            dr, dc = int(round(-uy * d)), int(round(-ux * d))   # Zelle d Schritte gegen den Wind
+            upwind_h = hp[steps + dr:steps + dr + ny, steps + dc:steps + dc + nx]
+            reach = wake_length * upwind_h
+            s = np.where(upwind_h > 0, np.clip(1 - d * raster.cell / np.maximum(reach, 1e-6), 0, 1), 0)
+            shelter = np.maximum(shelter, s)
+    factor = np.where(solid, 0.0, factor * (1 - 0.75 * shelter))
+
+    free = beaufort_to_ms(beaufort) * (PEDESTRIAN_HEIGHT_M / 10.0) ** WIND_PROFILE_EXPONENT
+    direction = np.where(np.hypot(gx, gy)[..., None] > 1e-6,
+                         np.dstack([gx, gy]) / np.maximum(np.hypot(gx, gy), 1e-6)[..., None],
+                         np.array([ux, uy]))
+    speed = free * factor
+    u, v = direction[..., 0] * speed, direction[..., 1] * speed
+
+    open_ = ~solid & (raster.landcover != LC_WATER)
+    n_open = max(1, int(open_.sum()))
+    kpis = {
+        "free_ped_ms": float(free),
+        "mean_ped_ms": float(speed[open_].mean()) if open_.any() else 0.0,
+        "max_ped_ms": float(speed[open_].max()) if open_.any() else 0.0,
+        "dangerous_share": float((speed[open_] >= DANGEROUS_WIND_MS).sum() / n_open),
+        "dangerous_m2": float((speed[open_] >= DANGEROUS_WIND_MS).sum() * raster.cell_area),
+        "sheltered_share": float((factor[open_] < 0.5).sum() / n_open),
+        "accelerated_share": float((factor[open_] > 1.2).sum() / n_open),
+    }
+    return WindField(u, v, speed, factor, shelter, solid, kpis)
+
+
 def _wind_kpis(speed, facades, total_facade_area, venturi) -> dict:
     has = len(facades) > 0
     high = facades["exposure"] >= 0.6 if has else []

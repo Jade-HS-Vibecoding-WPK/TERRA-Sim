@@ -8,11 +8,12 @@ import streamlit as st
 import shapely
 
 from modules import viewer_3d
-from modules.simulator import BEAUFORT_NAMES
+from modules.simulator import (BEAUFORT_NAMES, DANGEROUS_WIND_MS, WIND_PROFILE_EXPONENT,
+                               beaufort_to_ms)
 from modules.viewer_webgpu import scene as vscene
-from views.common import (GREY, current_wind, legend_ramp, legend_swatches, no_buildings, num,
-                          page_header, scene_for, scene_origin, show_scene, wind_direction_label,
-                          wind_presets)
+from views.common import (GREY, RADIO_OPTIONS, current_wind, current_wind_field, legend_ramp,
+                          legend_swatches, no_buildings, num, page_header, scene_for, scene_origin,
+                          show_scene, wind_direction_label, wind_presets)
 
 VENTURI_COLOR = (214, 39, 180)
 
@@ -58,8 +59,8 @@ def render():
     from views.navigation import require_project
 
     model = require_project()
-    page_header("Starkwind", "Sichtlinien-Analyse: Welche Fassaden stehen frei im Wind, wo wird er "
-                             "in engen Gassen beschleunigt?")
+    page_header("Starkwind", "Welche Fassaden stehen frei im Wind, wo wird er in engen Gassen "
+                             "beschleunigt, und wie strömt die Luft am Boden durch die Stadt?")
     b = model.buildings
 
     left, right = st.columns([1, 2.6], gap="large")
@@ -82,6 +83,24 @@ def render():
             k = result.kpis
             st.caption(f"Wind aus **{wind_direction_label(direction)}** · **{BEAUFORT_NAMES[beaufort]}**, "
                        f"ca. {num(k['speed_kmh'])} km/h in 10 m Höhe")
+        field = current_wind_field(model)
+        fk = field.kpis
+        with st.container(border=True):
+            st.markdown("**Am Boden (2 m Höhe)**")
+            st.radio("Heatmap", RADIO_OPTIONS["wind_ground"], key="wind_ground", horizontal=True)
+            st.toggle("Luftströmung animieren", key="wind_flow",
+                      help="Windteilchen fließen durch die Straßen (unten) und über die Dächer (oben). "
+                           "Farbe = Geschwindigkeit.")
+            g1, g2 = st.columns(2)
+            g1.metric("Gefährlich windig", f"{fk['dangerous_share']:.0%}",
+                      help=f"Anteil der Freiflächen mit mindestens {num(DANGEROUS_WIND_MS * 3.6)} km/h im Mittel "
+                           f"– Gehen wird gefährlich ({num(fk['dangerous_m2'])} m²)")
+            g2.metric("Im Windschatten", f"{fk['sheltered_share']:.0%}",
+                      help="Anteil der Freiflächen mit weniger als halb so viel Wind wie im Freien")
+            st.caption(f"Im Freien wären es in 2 m Höhe {num(fk['free_ped_ms'] * 3.6)} km/h; zwischen den "
+                       f"Gebäuden im Mittel {num(fk['mean_ped_ms'] * 3.6)} km/h, an Ecken und in Lücken bis "
+                       f"{num(fk['max_ped_ms'] * 3.6)} km/h. Die Menschen in der 3D-Ansicht spüren genau "
+                       "diesen Wind.")
     with right:
         share = k["facade_area_high_m2"] / k["facade_area_total_m2"] if k["facade_area_total_m2"] else 0
         c = st.columns(4)
@@ -103,10 +122,27 @@ def render():
             top = float((ground + b["height_m"].to_numpy()).max() - model.zmin)
         else:
             top = float(model.raster.corner_z.max() - model.zmin)
+        ground_mode = st.session_state.wind_ground
+        if ground_mode == "Wind in Fußgängerhöhe":
+            overlay, ramp = np.clip(field.speed / 20.0, 0, 1), "wind"
+        elif ground_mode == "Windschatten":
+            overlay, ramp = np.where(field.solid, 0, field.shelter), "water"
+        else:
+            overlay, ramp = None, "wind"
+        flow = None
+        if st.session_state.wind_flow and beaufort > 0:
+            upper = beaufort_to_ms(beaufort) * (max(10.0, top + 10) / 10.0) ** WIND_PROFILE_EXPONENT
+            flow = vscene.flow(field, model.raster, origin, top, upper, direction, fk["free_ped_ms"])
         scene = scene_for(model, colors=np.tile(np.array(GREY, float), (len(b), 1)), facades=facades,
                           paths=venturi, arrow=vscene.wind_arrow(direction, top + 15),
+                          overlay=overlay, ramp=ramp, flow=flow,
                           hazard=vscene.hazard("wind", bft=beaufort, from_deg=direction))
         show_scene(scene, key="scene_wind", height=640)
+        if ground_mode == "Wind in Fußgängerhöhe":
+            st.html(legend_ramp("wind", "windstill", "≥ 72 km/h", "Wind am Boden"))
+        elif ground_mode == "Windschatten":
+            st.html(legend_ramp("water", "kein Schatten", "tiefer Windschatten", "Windschatten"))
         st.html(legend_ramp("wind", "geschützt", "frei angeströmt", "Fassaden"))
-        st.html(legend_swatches([("Gasse mit Düseneffekt", VENTURI_COLOR), ("Windrichtung", (30, 100, 200))]))
+        st.html(legend_swatches([("Gasse mit Düseneffekt", VENTURI_COLOR), ("Windrichtung", (30, 100, 200))]
+                                + ([("Windteilchen: Farbe = Geschwindigkeit", (244, 109, 67))] if flow else [])))
     no_buildings(model)

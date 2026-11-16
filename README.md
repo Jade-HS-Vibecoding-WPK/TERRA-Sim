@@ -56,6 +56,7 @@ Die **Übersicht** zeigt Gebietskennzahlen (GRZ, GFZ, Versiegelung, Grünanteil)
 * Einstellung von Windrichtung (360°-Kompass) und Windstärke (Beaufort-Skala).
 * Geometrische Expositions- und Sichtlinienanalyse (Raycasting light) statt rechenintensiver CFD-Strömungsmechanik.
 * **Live-Auswertung:** Markierung ungeschützter, hochbelasteter Fassadenflächen sowie enger Straßenschluchten mit Düseneffekt (Venturi-Effekt).
+* **Luftströmung am Boden:** Strömungsfeld in 2 m Höhe aus Potentialströmung um die Gebäude (Beschleunigung an Ecken und in Lücken) und Windschatten hinter den Gebäuden. Als Heatmap „Wind in Fußgängerhöhe“ oder „Windschatten“, mit Kennzahlen (gefährlich windige Flächen ab 54 km/h, Anteil im Windschatten) und als **animierte Windteilchen**, die durch die Straßen und über die Dächer fließen.
 
 ### 5. 🫨 Modul D: Erdbeben
 * Magnitude, Entfernung zum Epizentrum und Untergrund wählen; Vorlagen von „spürbar“ bis „extrem“ (u. a. wie Roermond 1992).
@@ -72,10 +73,11 @@ Die **Übersicht** zeigt Gebietskennzahlen (GRZ, GFZ, Versiegelung, Grünanteil)
 * Zeigt spielerisch, wie man eine Gefahr mit Weg, Reichweite und Schadensstufen modelliert – und welche Gebäude Deckung bieten.
 
 ### 8. 🛸 Modul G: Alien-Invasion (Planspiel)
-* 1–5 UFOs kreuzen über dem Gebiet, bleiben stehen und holen Menschen mit dem Traktorstrahl hoch; die 3D-Ansicht zählt die Entführungen live mit. Gebäude bleiben heil.
+* 1–5 UFOs kreuzen über dem Gebiet, bleiben stehen und holen Menschen mit dem Traktorstrahl hoch; die 3D-Ansicht zählt die Entführungen live mit.
+* Ab 60 m Durchmesser wird ein UFO zum **Mutterschiff**: Es fliegt feste Haltepunkte an und saugt dort alle Gebäude ein, deren Mitte im Strahl liegt – sie schweben drehend nach oben und verschwinden im Schiff. Nach jeder Runde stehen sie wieder da; die Zahl der eingesaugten Gebäude steht in Seite und Übersicht.
 
 ### Animation: Menschen im Gebiet
-* Bis zu 1.000 kleine Figuren (Anzahl in der Seitenleiste, 0 = aus) laufen auf Straßen und Wegen und reagieren auf die gewählte Gefahr: Beim Orkan werden sie weggeweht, der Tornado saugt sie hoch, vor dem Monster fliehen sie, Explosionen schleudern sie weg, UFOs holen sie ab, beim Erdbeben stürzen sie, im Hochwasser schwimmen sie.
+* Bis zu 1.000 kleine Figuren (Anzahl in der Seitenleiste, 0 = aus) laufen auf Straßen und Wegen und reagieren auf die gewählte Gefahr: Beim Orkan werden sie weggeweht – je nach Wind an ihrer Stelle, im Windschatten bleiben sie stehen, an Ecken fliegen sie –, der Tornado saugt sie hoch, vor dem Monster fliehen sie, Explosionen schleudern sie weg, UFOs holen sie ab, beim Erdbeben stürzen sie, im Hochwasser schwimmen sie.
 * Die Figur mit dem Afro und dem Namensschild ist **Nik**. Der Knopf **Nik folgen** in der 3D-Ansicht zoomt auf ihn und hängt die Kamera an ihn – auch wenn er durch die Luft fliegt.
 * Tornado, Monster, Hubschrauber und UFOs bewegen sich; beim Erdbeben wackelt das ganze Modell wie auf einem Rütteltisch. Mit dem Knopf **Menschen** lässt sich die Animation anhalten.
 
@@ -115,7 +117,8 @@ terra-sim/
 │   ├── hazards.py             # Erdbeben, Tornado, Kaiju (Schadensgrad 0–5 je Gebäude)
 │   ├── viewer_webgpu/         # 3D-Ansicht der App: three.js mit WebGPU (Streamlit-Komponente)
 │   │   ├── scene.py           #   baut die Szene (Gelände, Gebäude, Analyse-Ebenen) – nur numpy
-│   │   └── frontend/          #   viewer.js rendert, people.js = Menschen, effects.js = Laser, Hubschrauber, UFOs
+│   │   └── frontend/          #   viewer.js rendert, people.js = Menschen, flow.js = Windteilchen,
+│   │                          #   effects.js = Laser, Hubschrauber, UFOs, Mutterschiff
 │   └── viewer_3d.py           # Einfache 3D-Szene mit pydeck (deck.gl) und Farbskalen
 │
 ├── views/                     # 🖥️ SEITEN DER OBERFLÄCHE (Streamlit)
@@ -216,7 +219,9 @@ TERRA-Sim liefert **Ersteinschätzungen für den Entwurf**, keine Gutachten.
 * **Tornado und Kaiju:** einfache geometrische Modelle (Abstand zur Bahn),
   keine Trümmerflug- oder Strömungsrechnung. Kaiju und Alien-Invasion sind
   Planspiele; die animierten Menschen sind Darstellung, keine Personenstrom-Simulation.
-* **Starkwind:** geometrische Sichtlinien-Analyse, keine Strömungssimulation.
+* **Starkwind:** geometrische Sichtlinien-Analyse für die Fassaden. Die Strömung
+  am Boden ist eine Potentialströmung mit vereinfachtem Windschatten – keine
+  CFD: keine Wirbel, keine Ablösung, keine Strömung über die Dächer hinweg.
 * **3D-Ansicht:** Die Bibliothek three.js wird beim Öffnen aus dem Internet geladen
   (jsDelivr). Ohne Internet bleibt die 3D-Ansicht leer – die App braucht für
   OpenStreetMap ohnehin eine Verbindung.

@@ -72,7 +72,8 @@ export class Effects {
     const uKey = ufos ? JSON.stringify(ufos) : null;
     if (uKey !== this.ufoKey) {
       this.ufoKey = uKey;
-      for (const u of this.ufos) this.group.remove(u.obj);
+      for (const u of this.ufos) this.group.remove(u.obj, u.beam);
+      if (this.buildings) this.buildings.restore(null);     // eingesaugte Gebäude zurückstellen
       this.ufos = [];
       if (ufos) {
         const rnd = seeded(ufos.seed || 7);
@@ -82,9 +83,14 @@ export class Effects {
           const beam = new this.T.Mesh(new this.T.ConeGeometry(1, 1, 32, 1, true), this.mat.beam.clone());
           beam.visible = false;
           this.group.add(beam);
+          const route = ufos.routes ? ufos.routes[k] : null;
           this.ufos.push({ obj, beam, s: rnd() * 100, phase: [rnd(), rnd(), rnd(), rnd()].map((p) => p * 6.28),
                            cycle: rnd() * 9, size: ufos.size, height: ufos.height,
-                           reach: ufos.reach, speed: ufos.speed });
+                           reach: ufos.reach, speed: ufos.speed,
+                           // Mutterschiff: feste Haltepunkte, an denen es Gebäude einsaugt
+                           route: route && route.length ? route : null, leg: 0, mode: 'hover', timer: 0,
+                           lifted: 0, from: route && route.length ? route[0] : null,
+                           all: route ? route.flatMap((s) => s.lift) : [] });
         }
       }
     }
@@ -237,15 +243,68 @@ export class Effects {
   }
 
   // UFOs: kreuzen über dem Gebiet, bleiben stehen und holen Menschen hoch
+  // Mutterschiff: von Halt zu Halt fliegen, beim Halt Gebäude nacheinander einsaugen
+  routeStep(u, dt) {
+    u.timer += dt;
+    if (u.mode === 'hover') {
+      const stop = u.route[u.leg];
+      while (u.lifted < stop.lift.length && u.timer > 1 + u.lifted * 0.35) {
+        const piece = this.buildings ? this.buildings.lift(stop.lift[u.lifted]) : null;
+        if (piece) this.rise(piece, u);
+        u.lifted += 1;
+      }
+      if (u.timer > Math.max(5, 1 + stop.lift.length * 0.35 + 4.8)) {
+        u.mode = 'fly'; u.timer = 0; u.from = stop; u.lifted = 0;
+        u.leg = (u.leg + 1) % u.route.length;
+      }
+      return [stop.x, stop.y, true];
+    }
+    const to = u.route[u.leg];
+    const duration = Math.max(3, Math.hypot(to.x - u.from.x, to.y - u.from.y) / 20);
+    const k = Math.min(1, u.timer / duration), e = k * k * (3 - 2 * k);
+    if (k >= 1) {
+      u.mode = 'hover'; u.timer = 0;
+      if (u.leg === 0 && this.buildings) this.buildings.restore(u.all);   // neue Runde: Gebäude wieder da
+    }
+    return [u.from.x + (to.x - u.from.x) * e, u.from.y + (to.y - u.from.y) * e, false];
+  }
+
+  // Ein Gebäude schwebt in den Strahl, dreht sich und verschwindet im UFO
+  rise(piece, u) {
+    const start = piece.position.clone();
+    const target = new this.T.Vector3();
+    this.live.push({ age: 0, life: 4.5, update: (e, dt) => {
+      const k = Math.min(1, e.age / e.life), ease = k * k * (3 - 2 * k);
+      target.copy(u.obj.position).setY(u.obj.position.y - u.size * 0.12);
+      piece.position.lerpVectors(start, target, ease);
+      piece.rotation.y += dt * (0.4 + k * 2);
+      piece.rotation.x = Math.sin(e.age * 1.7) * 0.3 * k;
+      piece.rotation.z = Math.cos(e.age * 1.3) * 0.25 * k;
+      piece.scale.setScalar(Math.max(0.02, 1 - 0.95 * Math.pow(k, 2.2)));
+    }, dispose: () => {
+      piece.parent.remove(piece);
+      piece.geometry.dispose();
+      piece.children.forEach((c) => { c.geometry.dispose(); c.material.dispose(); });
+    } });
+  }
+
   updateUfos(dt, t, ctx) {
     ctx.ufos = [];
     for (const u of this.ufos) {
-      u.cycle = (u.cycle + dt) % 9;
-      const beaming = u.cycle > 5;                     // 5 s fliegen, 4 s Strahl
-      u.s += dt * (beaming ? 0.02 : 1) * u.speed;
-      const A = u.reach, p = u.phase;
-      const x = A * (Math.sin(u.s * 0.11 + p[0]) * 0.8 + Math.sin(u.s * 0.27 + p[1]) * 0.2);
-      const y = A * (Math.sin(u.s * 0.13 + p[2]) * 0.8 + Math.sin(u.s * 0.31 + p[3]) * 0.2);
+      let x, y, beaming;
+      if (u.route) {
+        [x, y, beaming] = this.routeStep(u, dt);
+        u.cycle = beaming ? 5 + Math.min(u.timer, 3.9) : 0;   // für das Ein- und Ausblenden des Strahls
+        if (beaming) u.cycle = Math.min(u.cycle, 8.7);
+      } else {
+        u.cycle = (u.cycle + dt) % 9;
+        beaming = u.cycle > 5;                       // 5 s fliegen, 4 s Strahl
+        u.s += dt * (beaming ? 0.02 : 1) * u.speed;
+        const A = u.reach, p = u.phase;
+        x = A * (Math.sin(u.s * 0.11 + p[0]) * 0.8 + Math.sin(u.s * 0.27 + p[1]) * 0.2);
+        y = A * (Math.sin(u.s * 0.13 + p[2]) * 0.8 + Math.sin(u.s * 0.31 + p[3]) * 0.2);
+      }
+      const p = u.phase;
       const ground = this.groundAt(x, y);
       const top = ground + u.height + Math.sin(t * 1.3 + p[0]) * 1.5;
       u.obj.position.set(x, top, -y);

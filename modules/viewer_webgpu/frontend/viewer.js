@@ -14,6 +14,7 @@ import { ssao } from 'three/addons/tsl/display/SSAONode.js';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { Crowd } from './people.js';
 import { Effects } from './effects.js';
+import { FlowParticles } from './flow.js';
 
 // ---------------------------------------------------------------------------
 // Streamlit-Protokoll (Komponenten-API v1, ohne Zusatzbibliothek)
@@ -68,6 +69,9 @@ world.add(dynamic);                       // (so wackelt beim Erdbeben alles mit
 scene.add(world);
 const crowd = new Crowd(THREE, world, (x, y) => groundAt(x, y));
 const fx = new Effects(THREE, world, (x, y) => groundAt(x, y), crowd);
+const flow = new FlowParticles(THREE, world, (x, y) => groundAt(x, y));
+crowd.flow = flow;
+fx.buildings = { lift: (i) => liftBuilding(i), restore: (list) => restoreBuildings(list) };
 const counter = document.getElementById('counter');
 
 function skyTexture() {
@@ -125,8 +129,10 @@ renderer.setAnimationLoop(() => {
   // Bewegte Dinge: Tornado, Monster, Menschen, Erdbeben
   const ctx = animateMovers(t);
   const shaking = shakeWorld(t);
-  if (crowd.active || state.movers.length || shaking || fx.active) {
+  if (crowd.active || state.movers.length || shaking || fx.active || flow.active) {
+    flow.update(dt);
     fx.update(dt, t, ctx);
+    if (state.heightsDirty) { state.heightsDirty = false; applyHeights(); }
     crowd.update(dt, t, ctx);
     followNik();
     if (fx.ufos.length) counter.textContent = `👽 Entführt: ${crowd.abducted}`;
@@ -409,6 +415,8 @@ async function buildBuildings(b) {
   state.baseColors = new Float32Array(b.n * 3).fill(0.8);
   state.posOriginal = pos.slice();
   state.scaleKey = null;
+  state.scaleArr = new Float32Array(b.n).fill(1);
+  state.hidden = new Uint8Array(b.n);
   // Fußpunkt je Gebäude (für das "Zusammensacken" bei Schäden)
   state.baseY = new Float32Array(b.n).fill(Infinity);
   for (let i = 0; i < b.n; i++) {
@@ -435,14 +443,22 @@ async function setBuildingScale(b64) {
   if (!state.buildingMesh || (b64 || null) === state.scaleKey) return;
   state.scaleKey = b64 || null;
   const scale = b64 ? new Float32Array(await decode(b64)) : null;
+  state.scaleArr = new Float32Array(state.nBuildings).fill(1);
+  if (scale) state.scaleArr.set(scale.subarray(0, state.nBuildings));
+  applyHeights();
+}
+
+// Höhen aller Gebäude neu setzen (Einsturz-Faktor; eingesaugte Gebäude verschwinden nach unten)
+function applyHeights() {
+  if (!state.buildingMesh) return;
   const attr = state.buildingMesh.geometry.attributes.position;
   const src = state.posOriginal;
   for (let i = 0; i < state.nBuildings; i++) {
-    const s = scale && i < scale.length ? scale[i] : 1;
+    const s = state.scaleArr ? state.scaleArr[i] : 1;
     const base = state.baseY[i];
     const [first, last] = buildingRange(i);
     for (let v = first; v < last; v++) {
-      attr.array[v * 3 + 1] = base + (src[v * 3 + 1] - base) * s;
+      attr.array[v * 3 + 1] = state.hidden && state.hidden[i] ? -5000 : base + (src[v * 3 + 1] - base) * s;
     }
   }
   attr.needsUpdate = true;
@@ -452,6 +468,45 @@ async function setBuildingScale(b64) {
   dispose(state.edgeLines);
   state.edgeLines = makeEdges(state.buildingMesh.geometry);
   world.add(state.edgeLines);
+}
+
+// Ein Gebäude als eigenes Objekt herauslösen (z. B. zum Einsaugen durch das Mutterschiff)
+function liftBuilding(i) {
+  if (!state.buildingMesh || i >= state.nBuildings || state.hidden[i]) return null;
+  const [first, last] = buildingRange(i);
+  const src = state.buildingMesh.geometry.attributes.position.array;
+  const count = last - first;
+  let cx = 0, cz = 0;
+  for (let v = first; v < last; v++) { cx += src[v * 3]; cz += src[v * 3 + 2]; }
+  cx /= count; cz /= count;
+  const base = state.baseY[i];
+  const pos = new Float32Array(count * 3), col = new Float32Array(count * 3);
+  for (let v = 0; v < count; v++) {
+    pos[v * 3] = src[(first + v) * 3] - cx;
+    pos[v * 3 + 1] = src[(first + v) * 3 + 1] - base;
+    pos[v * 3 + 2] = src[(first + v) * 3 + 2] - cz;
+    col[v * 3] = state.baseColors[i * 3]; col[v * 3 + 1] = state.baseColors[i * 3 + 1];
+    col[v * 3 + 2] = state.baseColors[i * 3 + 2];
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.computeVertexNormals();
+  const piece = new THREE.Mesh(geo, state.buildingMesh.material);
+  piece.castShadow = true;
+  piece.add(makeEdges(geo));
+  piece.position.set(cx, base, cz);
+  world.add(piece);
+  state.hidden[i] = 1;
+  state.heightsDirty = true;
+  return piece;
+}
+
+function restoreBuildings(indices) {
+  if (!state.hidden) return;
+  if (indices) for (const i of indices) state.hidden[i] = 0;
+  else state.hidden.fill(0);
+  state.heightsDirty = true;
 }
 
 function buildingRange(i) {
@@ -904,6 +959,7 @@ async function update(args) {
   peopleButton.disabled = nikButton.disabled = crowd.mesh.count === 0;
   if (crowd.mesh.count === 0) setFollow(false);
   fx.configure(s.monster, s.ufos);
+  await flow.set(s.flow || null);
   counter.style.display = s.ufos ? 'block' : 'none';
   state.hazard = s.hazard || null;
   crowd.setHazard(state.hazard, s.water ? s.water.level : null);

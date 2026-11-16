@@ -257,6 +257,71 @@ def simulate_tornado(buildings, raster, ef: int, heading_deg: float, offset_m: f
 
 
 # ==========================================================================
+# Modul G – Alien-Invasion (Planspiel)
+# ==========================================================================
+
+MOTHERSHIP_SIZE_M = 60.0     # ab diesem Durchmesser saugt ein UFO auch Gebäude ein
+
+
+def simulate_alien(buildings, raster, count: int, size_m: float, height_m: float,
+                   stops: int = 5, seed: int | None = None) -> HazardResult:
+    """UFOs über dem Gebiet. Ein **Mutterschiff** (ab ``MOTHERSHIP_SIZE_M``) fliegt
+    ``stops`` Haltepunkte an und saugt dort jedes Gebäude ein, dessen Mitte im
+    Strahl liegt und das niedriger ist als 70 % der Flughöhe.
+
+    Kleine UFOs holen nur Menschen – das passiert in der 3D-Ansicht.
+    Rückgabe ``extra["routes"]``: je UFO eine Liste von Haltepunkten mit den
+    Nummern der Gebäude, die dort eingesaugt werden.
+    """
+    if seed is None:
+        seed = int(count * 131 + size_m * 17 + height_m * 7) % (2 ** 31)
+    rng = np.random.default_rng(seed)
+    extent = max(raster.nx, raster.ny) * raster.cell
+    center = np.array([raster.x0 + raster.nx * raster.cell / 2, raster.y0 + raster.ny * raster.cell / 2])
+    reach = 0.38 * extent
+    beam_r = 0.45 * size_m
+    mothership = size_m >= MOTHERSHIP_SIZE_M
+    n = len(buildings)
+    lifted_by = np.full(n, -1)
+    if n:
+        cent = shapely.centroid(np.asarray(buildings.geometry.values))
+        cx, cy = shapely.get_x(cent), shapely.get_y(cent)
+        liftable = buildings["height_m"].to_numpy(float) < 0.7 * height_m
+
+    routes = []
+    for k in range(int(count)):
+        route = []
+        for _ in range(stops if mothership else 0):
+            p = center + rng.uniform(-reach, reach, 2)
+            lift = []
+            if n:
+                d = np.hypot(cx - p[0], cy - p[1])
+                hit = np.flatnonzero((d < beam_r) & liftable & (lifted_by < 0))
+                hit = hit[np.argsort(d[hit])]          # die Mitte zuerst
+                lifted_by[hit] = k
+                lift = hit.tolist()
+            route.append({"point": p, "lift": lift})
+        routes.append(route)
+
+    damage = np.where(lifted_by >= 0, 5.0, 0.0)
+    overlay = None
+    if mothership:
+        xs = raster.x0 + (np.arange(raster.nx) + 0.5) * raster.cell
+        ys = raster.y0 + (np.arange(raster.ny) + 0.5) * raster.cell
+        gx, gy = np.meshgrid(xs, ys)
+        overlay = np.zeros((raster.ny, raster.nx))
+        for route in routes:
+            for stop in route:                          # Landespuren: heller Ring unter jedem Halt
+                d = np.hypot(gx - stop["point"][0], gy - stop["point"][1])
+                overlay = np.maximum(overlay, np.clip(1 - np.abs(d - beam_r) / 3.0, 0, 1) * 0.8)
+    kpis = _damage_kpis(buildings, damage)
+    gfa = (buildings["area_m2"].to_numpy(float) * buildings["levels"].to_numpy(float)) if n else np.zeros(0)
+    kpis.update({"mothership": mothership, "lifted": int((lifted_by >= 0).sum()),
+                 "lifted_gfa_m2": float(gfa[lifted_by >= 0].sum()), "beam_m": 2 * beam_r})
+    return HazardResult(damage, kpis, overlay, extra={"routes": routes})
+
+
+# ==========================================================================
 # Modul F – Kaiju-Angriff (Planspiel)
 # ==========================================================================
 

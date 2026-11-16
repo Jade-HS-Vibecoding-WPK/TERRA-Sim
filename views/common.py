@@ -21,8 +21,8 @@ from modules.climate_loader import (ClimateData, climate_summary, compass_name,
 from modules.map_selector import bbox_center, bbox_size_m
 from modules.osm_fetcher import OsmData, fetch_osm, metric_crs
 from modules.simulator import (LC_BUILDING, LC_GREEN, LC_STREET, LC_WATER, Raster,
-                               build_raster, simulate_flood, simulate_rain, simulate_wind)
-from modules.hazards import simulate_earthquake, simulate_kaiju, simulate_tornado
+                               build_raster, simulate_flood, simulate_rain, simulate_wind, wind_field)
+from modules.hazards import simulate_alien, simulate_earthquake, simulate_kaiju, simulate_tornado
 from modules.terrain_loader import DemGrid, flat_dem, load_dem
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
@@ -63,6 +63,8 @@ SETTINGS_DEFAULTS = {
     "kaiju_lasers": 6,
     "kaiju_helis": 4,
     "people_count": 300,
+    "wind_ground": "Wind in Fußgängerhöhe",
+    "wind_flow": True,
     "alien_ufos": 2,
     "alien_size": 30,
     "alien_height": 60,
@@ -77,6 +79,7 @@ SETTINGS_LIMITS = {
 }
 DIRECTION_SETTINGS = {"wind_dir", "tornado_heading", "kaiju_heading"}   # in 5°-Schritten
 RADIO_OPTIONS = {
+    "wind_ground": ["Wind in Fußgängerhöhe", "Windschatten", "keine"],
     "quake_soil": ["Fels", "Mittel (Kies, fester Lehm)", "Weich (Sand, Ton, Auen)"],
     "rain_display": ["Risiko-Index", "Wassertiefe in Senken", "Abflussbahnen"],
     "model_lod": ["LOD 1 – Klötzchenmodell", "LOD 2 – mit Dachformen"],
@@ -288,6 +291,16 @@ def cached_kaiju(model_key: str, height: float, heading: float, offset: float, l
     return simulate_kaiju(_buildings, _raster, height, heading, offset, lasers, helis)
 
 
+@st.cache_data(show_spinner="UFOs nähern sich …", max_entries=32)
+def cached_alien(model_key: str, count: int, size: float, height: float, _buildings, _raster):
+    return simulate_alien(_buildings, _raster, count, size, height)
+
+
+def current_alien(model: Model):
+    return cached_alien(model.key, int(_setting("alien_ufos")), float(_setting("alien_size")),
+                        float(_setting("alien_height")), model.buildings, model.raster)
+
+
 def _setting(key: str):
     return st.session_state.get(key, SETTINGS_DEFAULTS[key])
 
@@ -336,6 +349,18 @@ def damage_tooltips(model: Model, damage, prefix: str = "") -> list:
     return building_tooltips(model, extra)
 
 
+@st.cache_data(show_spinner="Strömung wird berechnet …", max_entries=32)
+def cached_wind_field(model_key: str, direction: float, beaufort: int, _raster: Raster, _heights):
+    return wind_field(_raster, _heights, direction, beaufort)
+
+
+def current_wind_field(model: Model):
+    direction = int(st.session_state.get("wind_dir", SETTINGS_DEFAULTS["wind_dir"]))
+    beaufort = int(st.session_state.get("wind_bft", SETTINGS_DEFAULTS["wind_bft"]))
+    return cached_wind_field(model.key, direction, beaufort, model.raster,
+                             model.buildings["height_m"].to_numpy(float))
+
+
 def current_wind(model: Model):
     direction = int(st.session_state.get("wind_dir", SETTINGS_DEFAULTS["wind_dir"]))
     beaufort = int(st.session_state.get("wind_bft", SETTINGS_DEFAULTS["wind_bft"]))
@@ -375,7 +400,10 @@ def _clean_settings(raw: dict) -> dict:
     clean = {}
     for key, default in SETTINGS_DEFAULTS.items():
         value = raw.get(key) if isinstance(raw, dict) else None
-        if isinstance(default, str) and isinstance(value, str):
+        if isinstance(default, bool):
+            if isinstance(value, bool):
+                clean[key] = value
+        elif isinstance(default, str) and isinstance(value, str):
             if key not in RADIO_OPTIONS or value in RADIO_OPTIONS[key]:
                 clean[key] = value                  # Auswahllisten prüfen die Seiten selbst
         elif isinstance(default, (int, float)) and isinstance(value, (int, float)) and not isinstance(value, bool):

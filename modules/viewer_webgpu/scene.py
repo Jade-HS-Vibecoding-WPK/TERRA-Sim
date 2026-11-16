@@ -283,10 +283,41 @@ def monster(center_xy, origin, height_m: float, heading_deg: float, travel_m: fl
             "misses": [{"u": e["u"], "point": local(e["point"])} for e in events["misses"]]}
 
 
-def ufos(count: int, size_m: float, height_m: float, extent_m: float, seed: int = 7) -> dict:
-    """UFOs, die über dem Gebiet kreuzen und mit dem Traktorstrahl Menschen hochholen."""
-    return {"count": int(count), "size": float(size_m), "height": float(height_m),
+def ufos(count: int, size_m: float, height_m: float, extent_m: float, seed: int = 7,
+         routes: list | None = None, origin=None) -> dict:
+    """UFOs, die über dem Gebiet kreuzen und mit dem Traktorstrahl Menschen hochholen.
+
+    Mit ``routes`` (aus ``hazards.simulate_alien``) fliegt jedes UFO feste
+    Haltepunkte an und saugt dort die angegebenen Gebäude ein (Mutterschiff).
+    """
+    spec = {"count": int(count), "size": float(size_m), "height": float(height_m),
             "reach": 0.38 * float(extent_m), "speed": 1.0, "seed": int(seed)}
+    if routes and any(routes) and origin is not None:
+        spec["routes"] = [[{"x": round(float(s["point"][0] - origin[0]), 2),
+                            "y": round(float(s["point"][1] - origin[1]), 2),
+                            "lift": [int(i) for i in s["lift"]]} for s in route] for route in routes]
+    return spec
+
+
+def flow(field, raster, origin, roof_top_rel: float, upper_speed_ms: float, direction_deg: float,
+         free_ped_ms: float, particles: int = 1600) -> dict:
+    """Strömungsfeld für die animierten Windteilchen (aus ``simulator.wind_field``).
+
+    Unten fließen die Teilchen in Fußgängerhöhe durch das Feld ``u``/``v``,
+    eine zweite Schicht zieht ungestört über die Dächer (``upper_speed_ms``).
+    """
+    peak = float(max(np.abs(field.u).max(), np.abs(field.v).max(), 1e-6))
+    scale = peak / 127.0
+    theta = np.radians(direction_deg)
+    return {
+        "nx": int(raster.nx), "ny": int(raster.ny), "cell": float(raster.cell),
+        "x0": float(raster.x0 - origin[0]), "y0": float(raster.y0 - origin[1]),
+        "u": b64(np.round(field.u / scale), np.int8), "v": b64(np.round(field.v / scale), np.int8),
+        "scale": scale, "solid": b64(field.solid, np.uint8),
+        "top": float(roof_top_rel), "upper_speed": float(upper_speed_ms),
+        "upper_dir": [float(-np.sin(theta)), float(-np.cos(theta))],
+        "free_ped": float(free_ped_ms), "particles": int(particles),
+    }
 
 
 def walkways(streets_m, origin, raster) -> list:

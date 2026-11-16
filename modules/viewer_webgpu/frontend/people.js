@@ -67,6 +67,7 @@ export class Crowd {
     this.enabled = true;
     this.wanted = 300;
     this.abducted = 0;
+    this.flow = null;                        // Strömungsfeld (flow.js), wenn vorhanden
     this.nik = makeNik(THREE);
     parent.add(this.nik);
     this._m = new THREE.Matrix4();
@@ -216,7 +217,7 @@ export class Crowd {
           break;
         }
         case FLY: {
-          const wind = h && h.type === 'wind' ? this.windVector(h) : null;
+          const wind = h && h.type === 'wind' ? this.windAt(i, h) : null;
           if (wind) {                                  // Luftwiderstand: Wind trägt weiter
             this.vx[i] += (wind[0] * 0.6 - this.vx[i]) * 0.6 * dt;
             this.vz[i] += (wind[1] * 0.6 - this.vz[i]) * 0.6 * dt;
@@ -290,6 +291,18 @@ export class Crowd {
     return [-Math.sin(a) * v, -Math.cos(a) * v];
   }
 
+  // Wind an der Stelle von Person i: [nach Osten, nach Norden, wirksame Beaufort-Stärke].
+  // Mit Strömungsfeld spürt man Windschatten und Eckenwind, sonst überall gleich.
+  windAt(i, h) {
+    const flow = this.flow;
+    if (!flow || !flow.spec) return [...this.windVector(h), h.bft];
+    const [u, v] = flow.sample(this.x[i], this.z[i]) || [0, 0];
+    const ratio = Math.hypot(u, v) / Math.max(0.1, flow.spec.free_ped);   // 1 = wie im Freien
+    const reference = 0.836 * Math.pow(h.bft, 1.5) * ratio;
+    const len = Math.hypot(u, v) || 1;
+    return [u / len * reference, v / len * reference, h.bft * Math.pow(ratio, 2 / 3)];
+  }
+
   // Gefahr in der Nähe? -> fliehen, wegfliegen …
   react(i, h, ctx) {
     if (!h) return;
@@ -334,15 +347,15 @@ export class Crowd {
     this.tilt[i] = 0;
     this.roll[i] = 0;
     if (h && h.type === 'wind' && h.bft >= 7) {
-      factor = Math.max(0.35, 1 - (h.bft - 7) * 0.13);
-      this.tilt[i] = Math.min(0.5, (h.bft - 6) * 0.07);   // gegen den Wind lehnen
-      const p = h.bft > 8 ? 0.06 * Math.pow((h.bft - 8) / 4, 2) : 0;
+      const [wx, wz, bft] = this.windAt(i, h);            // Wind genau hier (Windschatten, Ecken …)
+      factor = Math.max(0.35, 1 - Math.max(0, bft - 7) * 0.13);
+      this.tilt[i] = Math.min(0.5, Math.max(0, bft - 6) * 0.07);   // gegen den Wind lehnen
+      const p = bft > 8 ? 0.06 * Math.pow((bft - 8) / 4, 2) : 0;
       if (Math.random() < p * dt) {
-        const [wx, wz] = this.windVector(h);
-        this.launch(i, wx * rand(0.3, 0.6), rand(3, 4 + h.bft), wz * rand(0.3, 0.6));
+        this.launch(i, wx * rand(0.3, 0.6), rand(3, 4 + bft), wz * rand(0.3, 0.6));
         return;
       }
-      if (h.bft >= 9 && Math.random() < 0.03 * (h.bft - 8) * dt) { this.fallDown(i, rand(2, 4), false); return; }
+      if (bft >= 9 && Math.random() < 0.03 * (bft - 8) * dt) { this.fallDown(i, rand(2, 4), false); return; }
     } else if (h && h.type === 'quake') {
       const shaking = h.shaking;
       if (shaking > 0) {

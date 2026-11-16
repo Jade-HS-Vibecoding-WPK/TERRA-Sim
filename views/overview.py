@@ -7,7 +7,7 @@ import html
 import pandas as pd
 import streamlit as st
 
-from views.common import (area_metrics, climate_info, current_flood, current_kaiju, current_quake,
+from views.common import (area_metrics, climate_info, current_alien, current_flood, current_kaiju, current_quake,
                           current_rain, current_tornado, current_wind, num, page_header, pill,
                           project_file, risk_level, wind_direction_label)
 from modules.climate_loader import BEAUFORT_KMH
@@ -132,11 +132,20 @@ def render():
         _damage_tile("👾 Kaiju-Angriff", f"{ss.kaiju_height} m groß, läuft nach "
                      f"{wind_direction_label(ss.kaiju_heading)} · {ss.kaiju_lasers} Laser, "
                      f"{ss.kaiju_helis} Hubschrauber", kaiju.kpis, "kaiju")
+    alien = current_alien(model)
     cols = st.columns(3)
     with cols[0]:
-        _tile("🛸 Alien-Invasion", f"{ss.alien_ufos} UFO{'s' if ss.alien_ufos > 1 else ''}, "
-              f"{ss.alien_size} m Durchmesser", f"{ss.people_count} Menschen im Gebiet",
-              "Entführungen zählt die 3D-Ansicht live mit", "none", "Planspiel", "alien")
+        plural = ss.alien_ufos > 1
+        kind = ("Mutterschiffe" if plural else "Mutterschiff") if alien.kpis["mothership"] else \
+            ("UFOs" if plural else "UFO")
+        scenario = f"{ss.alien_ufos} {kind}, {ss.alien_size} m Durchmesser"
+        if alien.kpis["mothership"]:
+            level, status = risk_level(alien.kpis["lifted"] / max(1, alien.kpis["buildings_total"]), 0.02, 0.1)
+            _tile("🛸 Alien-Invasion", scenario, f"{alien.kpis['lifted']} von {alien.kpis['buildings_total']} Gebäuden",
+                  "werden eingesaugt · Entführungen zählt die 3D-Ansicht", level, status, "alien")
+        else:
+            _tile("🛸 Alien-Invasion", scenario, f"{ss.people_count} Menschen im Gebiet",
+                  "Entführungen zählt die 3D-Ansicht live mit", "none", "Planspiel", "alien")
 
     # ---- Klima ------------------------------------------------------------
     st.subheader("Klima am Standort")
