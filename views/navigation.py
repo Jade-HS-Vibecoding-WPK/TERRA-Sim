@@ -19,13 +19,14 @@ PAGES: dict = {}
 
 SECTIONS = [
     ("Standort", ["overview", "climate", "model"]),
-    ("Analysen", ["flood", "rain", "wind"]),
+    ("Wetter & Wasser", ["flood", "rain", "wind"]),
+    ("Weitere Katastrophen", ["quake", "tornado", "kaiju"]),
 ]
 
 
 def register() -> dict:
     """Legt alle Seiten an (bei jedem Durchlauf neu, das ist bei Streamlit üblich)."""
-    from views import climate, flood, model3d, overview, rain, setup, wind
+    from views import climate, earthquake, flood, kaiju, model3d, overview, rain, setup, tornado, wind
 
     PAGES.clear()
     PAGES.update({
@@ -43,6 +44,12 @@ def register() -> dict:
                         url_path="starkregen"),
         "wind": st.Page(wind.render, title="Starkwind", icon=":material/air:",
                         url_path="starkwind"),
+        "quake": st.Page(earthquake.render, title="Erdbeben", icon=":material/earthquake:",
+                         url_path="erdbeben"),
+        "tornado": st.Page(tornado.render, title="Tornado", icon=":material/tornado:",
+                           url_path="tornado"),
+        "kaiju": st.Page(kaiju.render, title="Kaiju-Angriff", icon=":material/pest_control:",
+                         url_path="kaiju"),
     })
     return PAGES
 
@@ -96,8 +103,11 @@ def sidebar():
                     'angelegt und geladen ist.</div>')
 
         st.divider()
-        st.caption("Daten: © OpenStreetMap-Mitwirkende · Open-Elevation / Open-Meteo · "
-                   "Meteostat. Heuristische Ersteinschätzung, kein Gutachten.")
+        current = get_model()
+        terrain = (current.dem.attribution or current.dem.source) if current else \
+            "DGM1 der Länder / Open-Elevation / Open-Meteo"
+        st.caption(f"Daten: © OpenStreetMap-Mitwirkende · Gelände: {terrain} · Meteostat. "
+                   "Heuristische Ersteinschätzung, kein Gutachten.")
 
 
 def _file_name(name: str) -> str:

@@ -300,28 +300,81 @@ def _fill_depression(capacity_depth: np.ndarray, volume: float, cell_area: float
     return np.clip(capacity_depth - high, 0, None)
 
 
-def simulate_rain(raster: Raster, n_buildings: int, rain_mm: float,
-                  building_block_m: float = 0.5) -> RainResult:
+def _closed_gaps(blocked: np.ndarray, max_cells: int) -> np.ndarray:
+    """Kleine, ringsum von Gebäuden eingeschlossene Lücken (z. B. Spalte zwischen
+    zwei OSM-Grundrissen, die beim Rastern übrig bleiben)."""
+    labels, count = ndimage.label(~blocked, structure=np.ones((3, 3)))
+    if not count:
+        return np.zeros_like(blocked)
+    sizes = ndimage.sum(np.ones_like(labels), labels, np.arange(1, count + 1))
+    edge = np.unique(np.concatenate([labels[0], labels[-1], labels[:, 0], labels[:, -1]]))
+    small = np.flatnonzero(sizes <= max_cells) + 1
+    return np.isin(labels, np.setdiff1d(small, edge))
+
+
+def _downpipes(raster: Raster, roof_m3: np.ndarray, obstacle: np.ndarray) -> np.ndarray:
+    """Fallrohre: Das Dachwasser jedes Gebäudes kommt an seiner tiefsten
+    Nachbarzelle auf den Boden. Rückgabe: Abflussmenge je Zelle (m³)."""
+    out = np.zeros_like(roof_m3)
+    labels = raster.building_idx + 1
+    for i, window in enumerate(ndimage.find_objects(labels)):
+        if window is None:
+            continue
+        # Fenster um eine Zelle erweitern, damit die Nachbarzellen dabei sind
+        rows = slice(max(0, window[0].start - 1), min(labels.shape[0], window[0].stop + 1))
+        cols = slice(max(0, window[1].start - 1), min(labels.shape[1], window[1].stop + 1))
+        mine = labels[rows, cols] == i + 1
+        volume = float(roof_m3[rows, cols][mine].sum())
+        ring = ndimage.binary_dilation(mine) & ~mine & ~obstacle[rows, cols]
+        if not ring.any():                       # ringsum bebaut: Wasser bleibt auf dem Dach
+            out[rows, cols][mine] += roof_m3[rows, cols][mine]
+            continue
+        z = np.where(ring, raster.elevation[rows, cols], np.inf)
+        r, c = np.unravel_index(np.argmin(z), z.shape)
+        out[rows.start + r, cols.start + c] += volume
+    return out
+
+
+def simulate_rain(raster: Raster, n_buildings: int, rain_mm: float, sewer_mm: float = 20.0,
+                  building_block_m: float = 0.5, min_courtyard_m2: float = 40.0,
+                  min_pond_m2: float = 25.0) -> RainResult:
     """Starkregen-Heuristik: Wo sammelt sich das Wasser?
 
-    1. Jede Zelle erzeugt Abfluss = Regenmenge x Abflussbeiwert (Versiegelung).
-    2. Das Wasser folgt dem Gefälle; Gebäude wirken als Hindernis.
-    3. In Geländesenken staut es sich, bis die Senke voll ist.
+    1. Die **Kanalisation** nimmt von Dächern, Straßen und befestigten Flächen
+       die ersten ``sewer_mm`` Liter je m² auf (ausgelegt sind Kanäle meist auf
+       Regen, wie er alle 2–5 Jahre vorkommt: etwa 15–25 l/m² in einer Stunde).
+    2. Der Rest fließt oberflächlich ab (Regen x Abflussbeiwert). Dachwasser
+       kommt über die **Fallrohre** an der tiefsten Stelle neben dem Gebäude an.
+    3. Das Wasser folgt dem Gefälle; Gebäude wirken als Hindernis.
+    4. In Geländesenken staut es sich, bis die Senke voll ist.
 
     ``building_block_m`` ist die Höhe, bis zu der ein Gebäude Wasser aufhält
     (Schwelle / Sockel). Steht das Wasser höher, läuft es "durch" das Gebäude
     weiter – ein geschlossener Innenhof staut also höchstens so tief ein.
+    Eingeschlossene Lücken unter ``min_courtyard_m2`` gelten als bebaut.
+    Ein Gebäude gilt als betroffen, wenn daneben mindestens 10 cm Wasser auf
+    einer Fläche von mindestens ``min_pond_m2`` stehen.
 
-    Vereinfachungen: keine Kanalisation, keine Versickerung über den
-    Abflussbeiwert hinaus, keine zeitliche Dynamik (das gesamte Ereignis
-    wird auf einmal bilanziert).
+    Vereinfachungen: Kanalisation als feste Menge (kein Rückstau, keine
+    Leitungen), keine zeitliche Dynamik (das gesamte Ereignis wird auf einmal
+    bilanziert).
     """
     lc = raster.landcover
     coeff = np.vectorize(RUNOFF_COEFF.get)(lc).astype(float)
-    runoff_m3 = rain_mm / 1000.0 * coeff * raster.cell_area
+    sewered = (lc == LC_STREET) | (lc == LC_BUILDING) | (lc == LC_OTHER)
+    effective_mm = np.where(sewered, max(0.0, rain_mm - sewer_mm), rain_mm)
+    runoff_m3 = effective_mm / 1000.0 * coeff * raster.cell_area
+    sewer_m3 = float((np.minimum(rain_mm, sewer_mm) / 1000.0 * coeff * raster.cell_area)[sewered].sum())
 
-    # Gebäude als Hindernis: Dachwasser läuft seitlich herunter, Abfluss fließt außen herum.
-    surface = raster.elevation + np.where(lc == LC_BUILDING, building_block_m, 0.0)
+    # Hindernisse: Gebäude plus winzige eingeschlossene Spalte dazwischen
+    obstacle = (lc == LC_BUILDING) | _closed_gaps(lc == LC_BUILDING,
+                                                 int(min_courtyard_m2 / raster.cell_area))
+    # Dachwasser über Fallrohre neben das Gebäude leiten
+    roof_m3 = np.where(raster.building_idx >= 0, runoff_m3, 0.0)
+    runoff_m3 = np.where(raster.building_idx >= 0, 0.0, runoff_m3) + _downpipes(raster, roof_m3, obstacle)
+
+    # Gebäude als Hindernis: Abfluss fließt außen herum.
+    surface = raster.elevation + np.where(obstacle, building_block_m, 0.0)
     filled, order, parent = _priority_flood(surface)
 
     # Abfluss aufsummieren: von den Quellen (zuletzt geflutet) zum Auslass
@@ -348,13 +401,20 @@ def simulate_rain(raster: Raster, n_buildings: int, rain_mm: float,
     # Risiko-Index: Wassertiefe in Senken (0.5 m = 1.0) oder starke Abflussbahn
     pond_index = np.clip(ponding / 0.5, 0, 1)
     flow_index = np.clip(np.log10(np.maximum(flow_m3, 1e-9) / 50.0) / np.log10(5000.0 / 50.0), 0, 1)
-    flow_index[(lc == LC_BUILDING) | (lc == LC_WATER)] = 0.0  # nur Gelände bewerten
+    flow_index[obstacle | (lc == LC_WATER)] = 0.0  # nur Gelände bewerten
     risk = np.maximum(pond_index, 0.7 * flow_index)
 
-    # Gebäude: größte Wassertiefe in den Nachbarzellen
+    # Gebäude: größte Wassertiefe in den Nachbarzellen. Pfützen unter ``min_pond_m2``
+    # zählen nicht – sie liegen unter der Genauigkeit von Raster und Höhenmodell.
     building_depth = np.zeros(n_buildings)
     if n_buildings:
-        nearby = ndimage.maximum_filter(ponding, size=3)
+        wet, n_ponds = ndimage.label(ponding >= 0.10, structure=np.ones((3, 3)))
+        if n_ponds:
+            area = ndimage.sum(np.ones_like(wet), wet, np.arange(1, n_ponds + 1)) * raster.cell_area
+            small = np.isin(wet, np.flatnonzero(area < min_pond_m2) + 1)
+        else:
+            small = np.zeros_like(wet, dtype=bool)
+        nearby = ndimage.maximum_filter(np.where(small, np.minimum(ponding, 0.099), ponding), size=3)
         building_depth = np.nan_to_num(np.asarray(ndimage.maximum(
             nearby, raster.building_idx + 1, np.arange(1, n_buildings + 1)), dtype=float))
     affected = building_depth >= 0.10
@@ -364,6 +424,8 @@ def simulate_rain(raster: Raster, n_buildings: int, rain_mm: float,
     kpis = {
         "sealed_share": raster.sealed_share,
         "rain_m3": float(rain_m3),
+        "sewer_mm": float(sewer_mm),
+        "sewer_m3": sewer_m3,
         "runoff_m3": float(runoff_m3.sum()),
         "runoff_coeff": float(runoff_m3.sum() / rain_m3) if rain_m3 else 0.0,
         "ponding_area_m2": float((ponding >= 0.10).sum() * raster.cell_area),

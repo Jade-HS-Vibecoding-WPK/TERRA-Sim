@@ -9,6 +9,7 @@ from modules.map_selector import (bbox_center, bbox_from_center, bbox_size_m, cl
                                   geocode_address, render_map_selector)
 from views.common import (build_model, cached_climate, cached_dem, cached_osm, get_model,
                           num, read_project_file)
+from modules.dgm1_loader import candidates as dgm1_candidates
 from modules.terrain_loader import flat_dem
 
 MAX_SIDE_M = 1500
@@ -83,13 +84,17 @@ def create_project(name: str, bbox: tuple, settings: dict | None = None):
             st.error(f"Die OSM-Abfrage ist fehlgeschlagen: {error}\n\n"
                      "Bitte in einer Minute erneut versuchen.")
             return
-        st.write("⛰️ Geländehöhen …")
+        st.write("⛰️ Geländehöhen (amtliches DGM1, sonst weltweites Höhenmodell) …")
         try:
             dem = cached_dem(bbox)
         except Exception:
             dem = flat_dem(bbox)
             notes.append("Kein Höhendienst erreichbar – es wird mit ebenem Gelände gerechnet. "
                          "Hochwasser und Starkregen sind so nicht aussagekräftig.")
+        if dgm1_candidates(bbox) and not dem.source.startswith("DGM1"):
+            notes.append("Das amtliche DGM1 war für dieses Gebiet nicht abrufbar (Server nicht erreichbar "
+                         "oder Gebiet an einer Landesgrenze). Es wird das gröbere weltweite Höhenmodell "
+                         f"genutzt ({dem.source}).")
         st.write("🌦️ Klimadaten der nächsten Wetterstation (Meteostat) …")
         climate, climate_error = None, ""
         try:
@@ -196,8 +201,13 @@ def render():
             name = st.text_input("Projektname", key="project_name",
                                  placeholder=ss.get("place_label") or "Projekt")
             st.caption("Geladen werden: Gebäude, Straßen, Grün- und Wasserflächen (OpenStreetMap), "
-                       "Gelände (Open-Elevation / Open-Meteo) und Klimadaten der nächsten "
-                       "Wetterstation (Meteostat). Danach werden 3D-Modell und Analysen freigeschaltet.")
+                       "Gelände (amtliches DGM1 mit 1 m Raster, wo verfügbar – sonst Open-Elevation / "
+                       "Open-Meteo) und Klimadaten der nächsten Wetterstation (Meteostat). Danach werden "
+                       "3D-Modell und Analysen freigeschaltet.")
+            dgm1 = dgm1_candidates(tuple(ss.draft_bbox))
+            st.caption(f"Höhenmodell für dieses Gebiet: **{dgm1[0].name}** (1-m-Raster)" if dgm1 else
+                       "Für dieses Gebiet ist kein amtliches DGM1 eingebunden – es werden die "
+                       "weltweiten, gröberen Höhenmodelle genutzt.")
             if st.button("Projekt anlegen & Daten laden", type="primary", icon=":material/rocket_launch:",
                          width="stretch"):
                 create_project(name.strip() or ss.get("place_label") or "Projekt", tuple(ss.draft_bbox))

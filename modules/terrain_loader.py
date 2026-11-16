@@ -1,17 +1,17 @@
 """Lädt Geländehöhen (DEM = Digital Elevation Model) für eine Bounding-Box.
 
-Die Höhen werden als regelmäßiges Punktraster von einer freien Web-API
-abgefragt. Fällt ein Dienst aus, wird automatisch der nächste probiert:
+Fällt eine Quelle aus, wird automatisch die nächste probiert:
 
-1. Open-Elevation  (https://open-elevation.com, SRTM-Daten)
-2. Open-Meteo      (https://open-meteo.com, Copernicus-DEM, 90 m)
-3. ebenes Gelände  (Notlösung, damit die App weiterläuft – ``source`` = "flach")
+1. DGM1 der Landesvermessung (1 m, ohne Gebäude) – in einigen
+   Bundesländern, siehe ``dgm1_loader.py``
+2. Open-Elevation  (https://open-elevation.com, SRTM-Daten)
+3. Open-Meteo      (https://open-meteo.com, Copernicus-DEM, 90 m)
+4. ebenes Gelände  (Notlösung, damit die App weiterläuft – ``source`` = "flach")
 
-Wichtig für die Interpretation: Diese globalen Höhenmodelle haben nur
-30–250 m Auflösung und enthalten teils Gebäude und Bäume; Open-Meteo
-liefert zudem nur ganze Meter. Die beiden Dienste können sich deshalb
-um mehrere Meter unterscheiden. Für ein Seminar-Werkzeug reicht das, für
-echte Planung braucht man ein Laserscan-DGM (DGM1) der Landesvermessung.
+Wichtig für die Interpretation: Die globalen Höhenmodelle (2. und 3.)
+haben nur 30–250 m Auflösung und enthalten teils Gebäude und Bäume;
+Open-Meteo liefert zudem nur ganze Meter. Sie können sich deshalb um
+mehrere Meter unterscheiden. Das DGM1 ist um Größenordnungen genauer.
 
 Beispiel::
 
@@ -47,6 +47,7 @@ class DemGrid:
     lats: np.ndarray       # (ny,) aufsteigend, Süd -> Nord
     elevation: np.ndarray  # (ny, nx) Höhe in Metern
     source: str            # welcher Dienst die Daten geliefert hat
+    attribution: str = ""  # Quellenangabe, die mit angezeigt werden muss
 
     @property
     def min(self) -> float:
@@ -112,6 +113,10 @@ PROVIDERS = {
     "Open-Elevation": _query_open_elevation,
     "Open-Meteo": _query_open_meteo,
 }
+ATTRIBUTION = {
+    "Open-Elevation": "Open-Elevation (SRTM)",
+    "Open-Meteo": "Open-Meteo (Copernicus DEM GLO-90)",
+}
 
 
 # --------------------------------------------------------------------------
@@ -119,6 +124,7 @@ PROVIDERS = {
 # --------------------------------------------------------------------------
 
 def grid_shape(bbox: BBox, spacing_m: float = 25.0, max_points: int = 40) -> tuple[int, int]:
+    # (max_points begrenzt die Abfragen bei den Punkt-Diensten; DGM1 nutzt mehr Punkte)
     """Anzahl Rasterpunkte ``(ny, nx)`` für etwa ``spacing_m`` Punktabstand."""
     west, south, east, north = bbox
     lat = (south + north) / 2
@@ -137,13 +143,22 @@ def flat_dem(bbox: BBox, elevation: float = 0.0) -> DemGrid:
 
 
 def load_dem(bbox: BBox, spacing_m: float = 25.0, smooth: bool = True,
-             providers: tuple[str, ...] = ("Open-Elevation", "Open-Meteo"),
+             providers: tuple[str, ...] = ("DGM1", "Open-Elevation", "Open-Meteo"),
              timeout: float = 25.0) -> DemGrid:
     """Lädt das Höhenraster für die Bounding-Box.
 
-    ``smooth=True`` glättet das Raster leicht – die globalen Höhenmodelle
+    Zuerst wird das amtliche DGM1 versucht (nur in einigen Bundesländern,
+    siehe ``dgm1_loader.py``), danach die weltweiten Dienste.
+    ``smooth=True`` glättet deren Raster leicht – die globalen Höhenmodelle
     rauschen in Städten um einige Dezimeter bis Meter.
     """
+    if "DGM1" in providers:
+        from .dgm1_loader import load_dgm1
+        dem = load_dgm1(bbox)
+        if dem is not None:
+            return dem
+        providers = tuple(p for p in providers if p != "DGM1")
+
     west, south, east, north = bbox
     ny, nx = grid_shape(bbox, spacing_m)
     lons = np.linspace(west, east, nx)
@@ -162,9 +177,50 @@ def load_dem(bbox: BBox, spacing_m: float = 25.0, smooth: bool = True,
             elevation = heights.reshape(ny, nx)
             if smooth:
                 elevation = _smooth(elevation)
-            return DemGrid(lons, lats, elevation, name)
+            return DemGrid(lons, lats, elevation, name, ATTRIBUTION[name])
 
     return flat_dem(bbox)
+
+
+# --------------------------------------------------------------------------
+# Hilfen für metrische Raster (DGM1)
+# --------------------------------------------------------------------------
+
+def _box_mean(z: np.ndarray, k: int) -> np.ndarray:
+    """Gleitender Mittelwert über k x k Zellen (gleiche Größe wie ``z``)."""
+    if k <= 1:
+        return z
+    pad = k // 2
+    p = np.pad(z, ((pad, k - 1 - pad), (pad, k - 1 - pad)), mode="edge")
+    c = np.cumsum(np.cumsum(p, axis=0), axis=1)
+    c = np.pad(c, ((1, 0), (1, 0)))
+    return (c[k:, k:] - c[:-k, k:] - c[k:, :-k] + c[:-k, :-k]) / (k * k)
+
+
+def grid_from_metric(z: np.ndarray, x_left: float, y_top: float, res: float, crs: str,
+                     bbox: BBox, spacing_m: float, source: str, attribution: str = "") -> DemGrid:
+    """Rechnet ein metrisches Raster (Zeile 0 = Norden) auf das ``DemGrid`` in WGS84 um.
+
+    ``x_left``/``y_top`` = linke obere Ecke der linken oberen Zelle, ``res`` = Zellgröße.
+    Vorher wird auf etwa ``spacing_m`` gemittelt, damit nichts "flimmert".
+    """
+    from pyproj import Transformer
+
+    z = np.asarray(z, dtype=float)
+    z = _box_mean(z, int(round(spacing_m / res)))
+    west, south, east, north = bbox
+    ny, nx = grid_shape(bbox, spacing_m, max_points=1000)
+    lons, lats = np.linspace(west, east, nx), np.linspace(south, north, ny)
+    gx, gy = Transformer.from_crs("EPSG:4326", crs, always_xy=True).transform(*np.meshgrid(lons, lats))
+
+    fc = np.clip((gx - x_left) / res - 0.5, 0, z.shape[1] - 1)
+    fr = np.clip((y_top - gy) / res - 0.5, 0, z.shape[0] - 1)
+    c0 = np.minimum(np.floor(fc).astype(int), z.shape[1] - 2)
+    r0 = np.minimum(np.floor(fr).astype(int), z.shape[0] - 2)
+    tc, tr = fc - c0, fr - r0
+    top = z[r0, c0] * (1 - tc) + z[r0, c0 + 1] * tc
+    bottom = z[r0 + 1, c0] * (1 - tc) + z[r0 + 1, c0 + 1] * tc
+    return DemGrid(lons, lats, top * (1 - tr) + bottom * tr, source, attribution)
 
 
 def _smooth(z: np.ndarray) -> np.ndarray:

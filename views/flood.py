@@ -7,10 +7,10 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from modules import viewer_3d
 from modules.simulator import flood_curve
-from views.common import (GREY, RED, base_layers, building_tooltips, current_flood, flood_references,
-                          legend_swatches, no_buildings, num, page_header, show_scene)
+from modules.viewer_webgpu import scene as vscene
+from views.common import (GREY, RED, building_tooltips, current_flood, flood_references,
+                          legend_swatches, no_buildings, num, page_header, scene_for, show_scene)
 
 WATER = (38, 120, 220)
 
@@ -47,16 +47,12 @@ def render():
         c[2].metric("Überflutete Fläche", f"{k['flooded_share']:.0%}",
                     help=f"{num(k['flooded_area_m2'])} m², davon {num(k['flooded_street_m2'])} m² Straßen")
         c[3].metric("Max. Wassertiefe", f"{num(k['max_depth_m'], 1)} m")
-        layers = base_layers(model)
-        if len(b):
-            colors = np.where(result.affected[:, None], np.array(RED, float), np.array(GREY, float))
-            extra = [f"<b style='color:#ff8a80'>Wassertiefe am Gebäude: {d:.1f} m</b>" if hit else ""
-                     for d, hit in zip(result.building_depth, result.affected)]
-            layers += viewer_3d.building_layers(model.buildings_wgs, b, model.zmin, colors,
-                                                building_tooltips(model, extra), lod=1)
-        if level > model.zmin:
-            layers.append(viewer_3d.water_layer(model.bbox, level - model.zmin))
-        show_scene(layers, model, key="scene_flood", height=640)
+        colors = np.where(result.affected[:, None], np.array(RED, float), np.array(GREY, float))
+        extra = [f"<b style='color:#ff8a80'>Wassertiefe am Gebäude: {d:.1f} m</b>" if hit else ""
+                 for d, hit in zip(result.building_depth, result.affected)]
+        water = vscene.water(level - model.zmin) if level > model.zmin else None
+        show_scene(scene_for(model, colors=colors, tips=building_tooltips(model, extra), water=water),
+                   key="scene_flood", height=640)
         st.html(legend_swatches([("Gebäude steht im Wasser", RED), ("Gebäude trocken", GREY),
                                  ("Wasserspiegel", WATER)]))
 

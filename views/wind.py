@@ -5,11 +5,48 @@ from __future__ import annotations
 import numpy as np
 import streamlit as st
 
+import shapely
+
 from modules import viewer_3d
 from modules.simulator import BEAUFORT_NAMES
-from views.common import (GREY, base_layers, building_tooltips, current_wind, legend_ramp,
-                          legend_swatches, no_buildings, num, page_header, show_scene,
-                          wind_direction_label, wind_presets)
+from modules.viewer_webgpu import scene as vscene
+from views.common import (GREY, current_wind, legend_ramp, legend_swatches, no_buildings, num,
+                          page_header, scene_for, scene_origin, show_scene, wind_direction_label,
+                          wind_presets)
+
+VENTURI_COLOR = (214, 39, 180)
+
+
+def _inside(raster, x, y) -> np.ndarray:
+    """Liegt der Punkt im Raster (= auf dem Geländesockel der 3D-Ansicht)?"""
+    return ((x >= raster.x0) & (x <= raster.x0 + raster.nx * raster.cell)
+            & (y >= raster.y0) & (y <= raster.y0 + raster.ny * raster.cell))
+
+
+def _facade_layer(facades, ground, origin, raster, min_exposure: float = 0.05):
+    mid_x = (facades["ax"] + facades["bx"]) / 2
+    mid_y = (facades["ay"] + facades["by"]) / 2
+    shown = facades[(facades["exposure"] >= min_exposure) & _inside(raster, mid_x, mid_y)]
+    tips = [f"<b>Fassade</b> {r.length_m:.0f} m × {r.height_m:.0f} m<br>"
+            f"Exposition: {r.exposure:.0%} (Windschatten {r.shelter:.0%})<br>"
+            f"Winddruck: {r.pressure_kn_m2:.2f} kN/m²" for r in shown.itertuples()]
+    colors = viewer_3d.color_ramp(shown["exposure"].to_numpy(), "wind")
+    return vscene.facades(shown, ground, origin, colors, tips)
+
+
+def _venturi_layer(venturi, ground, origin, raster):
+    ox, oy, oz = origin
+    lines, tips = [], []
+    for line, row in zip(venturi.geometry.values, venturi.itertuples()):
+        mid = line.interpolate(0.5, normalized=True)
+        if not _inside(raster, mid.x, mid.y):
+            continue
+        xy = shapely.get_coordinates(line) - (ox, oy)
+        z = np.full(len(xy), ground[row.building] - oz + 2.0)
+        lines.append(np.column_stack([xy, z]))
+        tips.append(f"<b>Düseneffekt</b><br>Lücke: {row.width_m:.1f} m breit, H/B = {row.hw_ratio:.1f}<br>"
+                    f"Beschleunigung: ×{row.factor:.2f} → ca. {row.speed_ms * 3.6:.0f} km/h")
+    return vscene.paths(lines, VENTURI_COLOR, tips, radius_m=1.2)
 
 
 def _apply_preset(direction: int, beaufort: int):
@@ -56,20 +93,20 @@ def render():
         c[2].metric("Düsen-Engstellen", num(k["venturi_count"]))
         c[3].metric("Spitze in Gassen", f"{num(k['venturi_max_speed_ms'] * 3.6)} km/h" if k["venturi_count"] else "–",
                     help="Geschätzte Windgeschwindigkeit in der am stärksten beschleunigten Gasse")
-        layers = base_layers(model)
+        origin = scene_origin(model)
+        facades = venturi = None
         if len(b):
             ground = b["ground_m"].to_numpy(float)
-            colors = np.tile(np.array(GREY, float), (len(b), 1))
-            layers += viewer_3d.building_layers(model.buildings_wgs, b, model.zmin, colors,
-                                                building_tooltips(model), lod=1)
             if beaufort > 0:
-                layers.append(viewer_3d.facade_layer(result.facades, ground, model.zmin, model.crs))
-                layers.append(viewer_3d.venturi_layer(result.venturi, ground, model.zmin, model.crs))
+                facades = _facade_layer(result.facades, ground, origin, model.raster)
+                venturi = _venturi_layer(result.venturi, ground, origin, model.raster)
             top = float((ground + b["height_m"].to_numpy()).max() - model.zmin)
         else:
             top = float(model.raster.corner_z.max() - model.zmin)
-        layers.append(viewer_3d.wind_arrow_layer(model.bbox, direction, top + 15))
-        show_scene(layers, model, key="scene_wind", height=640)
+        scene = scene_for(model, colors=np.tile(np.array(GREY, float), (len(b), 1)), facades=facades,
+                          paths=venturi, arrow=vscene.wind_arrow(direction, top + 15),
+                          hazard=vscene.hazard("wind", bft=beaufort, from_deg=direction))
+        show_scene(scene, key="scene_wind", height=640)
         st.html(legend_ramp("wind", "geschützt", "frei angeströmt", "Fassaden"))
-        st.html(legend_swatches([("Gasse mit Düseneffekt", (214, 39, 180)), ("Windrichtung", (30, 100, 200))]))
+        st.html(legend_swatches([("Gasse mit Düseneffekt", VENTURI_COLOR), ("Windrichtung", (30, 100, 200))]))
     no_buildings(model)

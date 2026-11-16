@@ -1,7 +1,7 @@
 # 🌍 TERRA-Sim – 3D Terrain, Environment & Resilience Simulator
 
 > **Dozenten-Referenzprojekt & Open-Source Boilerplate**  
-> Ein interaktives Web-Tool zur automatischen Generierung von 3D-Stadtmodellen (LOD 1–2) und zur heuristischen Simulation von Umweltkatastrophen (Hochwasser, Starkregen, Starkwind).
+> Ein interaktives Web-Tool zur automatischen Generierung von 3D-Stadtmodellen (LOD 1–2) und zur heuristischen Simulation von Katastrophen (Hochwasser, Starkregen, Starkwind, Erdbeben, Tornado – und als Planspiel ein Kaiju-Angriff).
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Framework](https://img.shields.io/badge/Streamlit-1.40%2B-FF4B4B)
@@ -39,21 +39,40 @@ Die **Übersicht** zeigt Gebietskennzahlen (GRZ, GFZ, Versiegelung, Grünanteil)
 * Auswahl eines beliebigen Untersuchungsgebiets über Adresssuche oder Bounding-Box auf einer interaktiven 2D-Karte.
 * Automatischer Abruf von Gebäude-Grundrissen, Geschosszahlen, Straßen und Grünflächen über OpenStreetMap (`osmnx`).
 * Extrusion zu einem 3D-Modell: **LOD 1** (Klötzchenmodell auf Basis realer Höhen oder Geschoss-Schätzungen) und **LOD 2** (Annäherung einfacher Dachformen, sofern in OSM hinterlegt).
+* **3D-Ansicht mit WebGPU** (three.js): Das Gebiet steht wie ein Arbeitsmodell auf einem Geländesockel, mit Sonnenschatten, Umgebungsverdeckung (SSAO) und feinen Gebäudekanten. Gebäude zeigen beim Überfahren ihre Daten; die Kamera bleibt beim Wechsel zwischen den Seiten stehen. Browser ohne WebGPU nutzen automatisch WebGL 2.
 
 ### 2. 🌊 Modul A: Hochwasser-Simulation („Bathtub-Model“)
-* Abruf eines digitalen Geländemodells (DEM) zur Bestimmung der realen Topografie.
+* Abruf eines digitalen Geländemodells zur Bestimmung der realen Topografie: in Niedersachsen, NRW, Bayern, Berlin/Brandenburg, Hessen, Mecklenburg-Vorpommern und Rheinland-Pfalz das **amtliche DGM1** der Landesvermessung (1-m-Raster aus Laserscanning, ohne Gebäude und Bäume), sonst ein weltweites Höhenmodell.
 * Stufenloser Schieberegler für den Wasserpegel (`+0.0 m` bis `+10.0 m`).
 * **Live-Auswertung:** Visuelle Schnittebene im 3D-Modell; betroffene Gebäude färben sich rot; automatische Berechnung der überfluteten Bruttogrundfläche (BGF) im Erdgeschoss.
 
 ### 3. 🌧️ Modul B: Starkregen & Oberflächenabfluss
 * Auswahl definierter Starkregen-Szenarien (z. B. Jahrhundertregen: `100 l/m²`).
 * Kombination aus topografischen Senken und dem lokalen Versiegelungsgrad (Verhältnis von Straßen/Dächern zu Grünflächen/Parks).
+* **Kanalisation und Fallrohre:** Die Kanäle nehmen eine einstellbare Regenmenge auf (Standard 20 l/m²); was darüber hinausgeht, läuft vom Dach über die Fallrohre an die tiefste Stelle neben dem Gebäude.
 * **Live-Auswertung:** Heatmap am Boden zur Identifikation von Wasseransammlungen und Rückstau-Risiken.
 
 ### 4. 💨 Modul C: Starkwind & Urbane Kamineffekte
 * Einstellung von Windrichtung (360°-Kompass) und Windstärke (Beaufort-Skala).
 * Geometrische Expositions- und Sichtlinienanalyse (Raycasting light) statt rechenintensiver CFD-Strömungsmechanik.
 * **Live-Auswertung:** Markierung ungeschützter, hochbelasteter Fassadenflächen sowie enger Straßenschluchten mit Düseneffekt (Venturi-Effekt).
+
+### 5. 🫨 Modul D: Erdbeben
+* Magnitude, Entfernung zum Epizentrum und Untergrund wählen; Vorlagen von „spürbar“ bis „extrem“ (u. a. wie Roermond 1992).
+* **Makroseismische Methode** (Lagomarsino & Giovinazzi): Intensität nach EMS-98 am Standort × Verletzbarkeit je Gebäude (Klasse aus Gebäudetyp und Geschosszahl, Zuschläge für Grundrissform und Lage im Block).
+* Ergebnis: Schadensgrad 0–5 je Gebäude, schwer beschädigte Gebäude sacken in der 3D-Ansicht zusammen.
+
+### 6. 🌪️ Modul E: Tornado
+* Stärke nach Enhanced-Fujita-Skala (EF0–EF5), Zugrichtung und Lage der Bahn.
+* Wirbel nach Rankine plus Zuggeschwindigkeit (rechts der Bahn stärker); Schaden je Gebäude aus der Windgeschwindigkeit, leichte Bauten früher, Stahlbeton später.
+
+### 7. 👾 Modul F: Kaiju-Angriff (Planspiel)
+* Ein Riesenmonster (eigene Figur, 20–150 m) läuft quer durch das Gebiet: Schneise, Reichweite von Schwanz und Armen, Erschütterung der Schritte.
+* Zeigt spielerisch, wie man eine Gefahr mit Weg, Reichweite und Schadensstufen modelliert – und welche Gebäude Deckung bieten.
+
+### Animation: Menschen im Gebiet
+* Kleine Figuren laufen auf Straßen und Wegen und reagieren auf die gewählte Gefahr: Beim Orkan werden sie weggeweht, der Tornado saugt sie hoch, vor dem Monster fliehen sie, beim Erdbeben stürzen sie, im Hochwasser schwimmen sie.
+* Tornado und Monster ziehen animiert über ihre Bahn; beim Erdbeben wackelt das ganze Modell wie auf einem Rütteltisch. Mit dem Knopf **Menschen** lässt sich die Animation abschalten.
 
 ---
 
@@ -63,8 +82,8 @@ Die **Übersicht** zeigt Gebietskennzahlen (GRZ, GFZ, Versiegelung, Grünanteil)
 | :--- | :--- | :--- |
 | **Frontend / UI** | `streamlit`, `streamlit-folium` | Benutzeroberfläche, Slider, KPI-Dashboard & 2D-Kartenintegration |
 | **Geodaten & GIS** | `osmnx`, `geopandas`, `shapely` | Abruf und geometrische Aufbereitung von OpenStreetMap-Daten |
-| **Topografie & Wetter**| `open-elevation API`, `meteostat` | Geländehöhen (DEM) und historische Klimadaten |
-| **3D-Visualisierung** | `pydeck` (deck.gl), `plotly` | Hardwarebeschleunigtes 3D-Rendering im Webbrowser |
+| **Topografie & Wetter**| DGM1 der Länder (WCS, STAC, Kacheln), `open-elevation API`, `meteostat` | Geländehöhen und historische Klimadaten |
+| **3D-Visualisierung** | `three.js` (WebGPU), `pydeck`, `plotly` | 3D-Ansicht mit Schatten und Umgebungsverdeckung im Browser; Diagramme |
 | **CAD / 3D-Export** | `trimesh`, `ezdxf` | Export der 3D-Geometrien als `.obj`, `.stl` oder `.dxf` |
 
 ---
@@ -83,11 +102,16 @@ terra-sim/
 ├── modules/                   # 🔌 WIEDERVERWENDBARE MODULE FÜR STUDIERENDE
 │   ├── map_selector.py        # 2D-Karte & Koordinaten-Auswahl
 │   ├── osm_fetcher.py         # Lädt Gebäude, Höhen, Straßen & Grünflächen
-│   ├── terrain_loader.py      # Lädt Geländehöhen (DEM)
+│   ├── terrain_loader.py      # Lädt Geländehöhen (DEM), mit Rückfall auf weltweite Dienste
+│   ├── dgm1_loader.py         # Amtliches DGM1 (1 m) der Bundesländer
 │   ├── climate_loader.py      # Lädt Klimadaten (Meteostat): Steckbrief, Windrose
 │   ├── mesh_builder.py        # Baut das 3D-Modell & exportiert DXF/OBJ/STL
 │   ├── simulator.py           # Berechnet Hochwasser-, Regen- und Wind-Effekte
-│   └── viewer_3d.py           # Zeichnet die 3D-Szene im Browser (pydeck)
+│   ├── hazards.py             # Erdbeben, Tornado, Kaiju (Schadensgrad 0–5 je Gebäude)
+│   ├── viewer_webgpu/         # 3D-Ansicht der App: three.js mit WebGPU (Streamlit-Komponente)
+│   │   ├── scene.py           #   baut die Szene (Gelände, Gebäude, Analyse-Ebenen) – nur numpy
+│   │   └── frontend/          #   HTML + JavaScript (viewer.js rendert, people.js = Menschen)
+│   └── viewer_3d.py           # Einfache 3D-Szene mit pydeck (deck.gl) und Farbskalen
 │
 ├── views/                     # 🖥️ SEITEN DER OBERFLÄCHE (Streamlit)
 │   ├── navigation.py          # Seitenstruktur, Sperre bis ein Projekt geladen ist
@@ -96,7 +120,8 @@ terra-sim/
 │   ├── overview.py            # Übersicht mit Kennzahlen, Analyse-Kacheln, Exporten
 │   ├── climate.py             # Klima am Standort
 │   ├── model3d.py             # 3D-Modell & Export
-│   └── flood.py · rain.py · wind.py   # die drei Analysen
+│   ├── flood.py · rain.py · wind.py   # Wetter & Wasser
+│   └── earthquake.py · tornado.py · kaiju.py   # weitere Katastrophen
 │
 └── assets/                    # Logo, Icon und CSS-Styling
 ```
@@ -165,15 +190,27 @@ print(climate_summary(klima)["prcp_max_day"])       # stärkster Tagesregen (mm)
 
 TERRA-Sim liefert **Ersteinschätzungen für den Entwurf**, keine Gutachten.
 
-* **Geländehöhen** stammen aus freien globalen Höhenmodellen (30–250 m
-  Auflösung, teils mit Gebäuden und Bäumen). In flachen Gebieten können sie
-  um mehrere Meter danebenliegen. Das wirkt sich besonders auf den Starkregen
-  aus: Scheinbare Senken im Höhenmodell erscheinen als Wasseransammlungen.
+* **Geländehöhen:** Das amtliche DGM1 ist in sieben Datenquellen eingebunden
+  (acht Länder, siehe `modules/dgm1_loader.py`). Die übrigen Länder bieten ihr
+  DGM1 nur als große Pakete zum Download an; dort, an Landesgrenzen und im
+  Ausland nutzt TERRA-Sim freie globale Höhenmodelle (30–250 m Auflösung,
+  teils mit Gebäuden und Bäumen), die in flachen Gebieten um mehrere Meter
+  danebenliegen können. Welche Quelle genutzt wurde, steht in der Seitenleiste.
 * **Klimadaten** stammen von der nächstgelegenen Station mit ausreichend
   vollständigen Daten, die bis zu 60 km entfernt sein kann. Der stärkste
   Tagesregen ist kein Kurzzeit-Starkregen (z. B. 1 Stunde).
 * **Gebäudehöhen** sind in OpenStreetMap oft nicht erfasst und werden dann
   aus der Geschosszahl oder dem Gebäudetyp geschätzt.
 * **Hochwasser:** Badewannen-Modell ohne Deiche, Fließwege und Zeitverlauf.
-* **Starkregen:** ohne Kanalisation und ohne zeitliche Dynamik.
+* **Starkregen:** Kanalisation als feste Aufnahmemenge (ohne Rückstau und
+  Leitungsnetz), keine zeitliche Dynamik. Ein Gebäude zählt als betroffen,
+  wenn daneben mindestens 10 cm Wasser auf mindestens 25 m² stehen.
+  Geschlossene Innenhöfe sammeln weiterhin viel Dachwasser.
+* **Erdbeben:** Die Bauweise wird aus dem OSM-Gebäudetyp geschätzt, Baujahr
+  und Zustand sind unbekannt. Die Intensität ist im ganzen Gebiet gleich.
+* **Tornado und Kaiju:** einfache geometrische Modelle (Abstand zur Bahn),
+  keine Trümmerflug- oder Strömungsrechnung. Kaiju ist ein Planspiel.
 * **Starkwind:** geometrische Sichtlinien-Analyse, keine Strömungssimulation.
+* **3D-Ansicht:** Die Bibliothek three.js wird beim Öffnen aus dem Internet geladen
+  (jsDelivr). Ohne Internet bleibt die 3D-Ansicht leer – die App braucht für
+  OpenStreetMap ohnehin eine Verbindung.

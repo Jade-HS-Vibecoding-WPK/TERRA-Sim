@@ -8,8 +8,8 @@ from shapely import affinity
 
 from modules import mesh_builder, viewer_3d
 from modules.map_selector import bbox_center
-from views.common import (GREY, RADIO_OPTIONS, SOURCE_COLORS, base_layers, building_tooltips,
-                          legend_ramp, legend_swatches, num, page_header, show_scene)
+from views.common import (GREY, RADIO_OPTIONS, SOURCE_COLORS, legend_ramp, legend_swatches, num,
+                          page_header, scene_for, show_scene)
 
 
 def building_colors(model, mode: str) -> np.ndarray:
@@ -102,18 +102,11 @@ def render():
                        "(tiefster Geländepunkt).")
 
     with right:
-        layers = base_layers(model)
-        if len(b):
-            layers += viewer_3d.building_layers(model.buildings_wgs, b, model.zmin,
-                                                building_colors(model, color_mode),
-                                                building_tooltips(model), lod)
-        show_scene(layers, model, key="scene_model", height=640)
+        colors = building_colors(model, color_mode) if color_mode != "Einheitlich" else None
+        show_scene(scene_for(model, lod=lod, colors=colors), key="scene_model", height=640)
         if color_mode == "Gebäudehöhe":
             st.html(legend_ramp("height", "0 m", f"{num(_top_height(model))} m", "Gebäudehöhe"))
         elif color_mode == "Datenquelle der Höhe":
             st.html(legend_swatches([("gemessene Höhe (OSM)", SOURCE_COLORS["OSM-Höhe"]),
                                      ("aus Geschosszahl", SOURCE_COLORS["OSM-Geschosse"]),
                                      ("geschätzt", SOURCE_COLORS["Schätzung"])]))
-        else:
-            st.caption("Maus: ziehen = verschieben, rechte Taste / Strg = drehen und kippen, Rad = zoomen. "
-                       "Gebäude antippen für Details.")

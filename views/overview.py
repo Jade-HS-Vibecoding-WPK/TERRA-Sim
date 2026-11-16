@@ -7,8 +7,9 @@ import html
 import pandas as pd
 import streamlit as st
 
-from views.common import (area_metrics, climate_info, current_flood, current_rain, current_wind,
-                          num, page_header, pill, project_file, risk_level, wind_direction_label)
+from views.common import (area_metrics, climate_info, current_flood, current_kaiju, current_quake,
+                          current_rain, current_tornado, current_wind, num, page_header, pill,
+                          project_file, risk_level, wind_direction_label)
 from modules.climate_loader import BEAUFORT_KMH
 from modules.simulator import BEAUFORT_NAMES
 
@@ -31,7 +32,14 @@ def _tile(title: str, scenario: str, value: str, sub: str, level: str, status: s
         st.page_link(PAGES[page_key], label="Analyse öffnen", icon=":material/arrow_forward:")
 
 
-def _results_table(model, flood, rain, wind) -> pd.DataFrame:
+def _damage_tile(title: str, scenario: str, k: dict, page_key: str):
+    share = k["heavy"] / max(1, k["buildings_total"])
+    level, status = risk_level(share, warn=0.02, risk=0.15) if k["damaged"] else ("ok", "keine Schäden")
+    _tile(title, scenario, f"{k['heavy']} von {k['buildings_total']} Gebäuden",
+          f"schwer beschädigt · {k['destroyed']} zerstört · {k['damaged']} mit Schäden", level, status, page_key)
+
+
+def _results_table(model, flood, rain, wind, quake=None, tornado=None, kaiju=None) -> pd.DataFrame:
     """Gebäude mit allen Analyse-Ergebnissen (für den GeoJSON-Export)."""
     b = model.buildings_wgs
     table = b[["osm_id", "name", "building", "levels", "height_m", "height_source",
@@ -41,6 +49,9 @@ def _results_table(model, flood, rain, wind) -> pd.DataFrame:
     table["starkregen_tiefe_m"] = rain.building_depth.round(2)
     table["starkregen_betroffen"] = rain.affected
     table["wind_exposition"] = wind.building_exposure.round(2)
+    for name, result in (("erdbeben", quake), ("tornado", tornado), ("kaiju", kaiju)):
+        if result is not None:
+            table[f"{name}_schadensgrad"] = result.grade
     table["ground_m"] = table["ground_m"].round(2)
     return table
 
@@ -108,6 +119,19 @@ def render():
               f"frei angeströmt, bis {num(k['max_pressure_kn_m2'], 2)} kN/m² · "
               f"{k['venturi_count']} Düsen-Engstellen", level, status, "wind")
 
+    quake, tornado, kaiju = current_quake(model), current_tornado(model), current_kaiju(model)
+    ss = st.session_state
+    cols = st.columns(3)
+    with cols[0]:
+        _damage_tile("🫨 Erdbeben", f"Mw {num(ss.quake_mw, 1)} in {ss.quake_dist_km} km · Intensität "
+                     f"{num(quake.kpis['intensity'], 1)}", quake.kpis, "quake")
+    with cols[1]:
+        _damage_tile("🌪️ Tornado", f"EF{ss.tornado_ef} nach {wind_direction_label(ss.tornado_heading)}",
+                     tornado.kpis, "tornado")
+    with cols[2]:
+        _damage_tile("👾 Kaiju-Angriff", f"{ss.kaiju_height} m groß, läuft nach "
+                     f"{wind_direction_label(ss.kaiju_heading)}", kaiju.kpis, "kaiju")
+
     # ---- Klima ------------------------------------------------------------
     st.subheader("Klima am Standort")
     info = climate_info(model)
@@ -138,10 +162,17 @@ def render():
             ("Starkregen", "Oberflächenabfluss", round(rain.kpis["runoff_m3"]), "m³"),
             ("Starkwind", f"Bft {beaufort} aus {direction}°: frei angeströmte Fassaden",
              round(wind.kpis["facade_area_high_m2"]), "m²"),
-            ("Starkwind", "Engstellen mit Düseneffekt", wind.kpis["venturi_count"], "")]
+            ("Starkwind", "Engstellen mit Düseneffekt", wind.kpis["venturi_count"], ""),
+            ("Erdbeben", f"Mw {ss.quake_mw:.1f} in {ss.quake_dist_km} km: Intensität",
+             round(quake.kpis["intensity"], 1), "EMS-98"),
+            ("Erdbeben", "Schwer beschädigte Gebäude (Grad ≥ 3)", quake.kpis["heavy"], ""),
+            ("Tornado", f"EF{ss.tornado_ef}: schwer beschädigte Gebäude (Grad ≥ 3)", tornado.kpis["heavy"], ""),
+            ("Tornado", "Zerstörte Gebäude", tornado.kpis["destroyed"], ""),
+            ("Kaiju", f"{ss.kaiju_height} m: zerstörte Gebäude", kaiju.kpis["destroyed"], "")]
     kpi_csv = pd.DataFrame(kpis, columns=["Bereich", "Kennzahl", "Wert", "Einheit"]).to_csv(
         index=False, sep=";", decimal=",").encode("utf-8-sig")
-    geojson = _results_table(model, flood, rain, wind).to_json(drop_id=True).encode("utf-8")
+    geojson = _results_table(model, flood, rain, wind, quake, tornado, kaiju).to_json(
+        drop_id=True).encode("utf-8")
 
     cols = st.columns(3)
     cols[0].download_button("Projektdatei (.json)", project_file(model), file_name="projekt.terrasim.json",

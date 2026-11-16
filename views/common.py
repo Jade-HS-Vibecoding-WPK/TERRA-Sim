@@ -14,13 +14,15 @@ import shapely
 import streamlit as st
 from shapely.geometry import box
 
-from modules import viewer_3d
+from modules import viewer_3d, viewer_webgpu
+from modules.viewer_webgpu import scene as vscene
 from modules.climate_loader import (ClimateData, climate_summary, compass_name,
                                     kmh_to_beaufort, load_climate)
 from modules.map_selector import bbox_center, bbox_size_m
 from modules.osm_fetcher import OsmData, fetch_osm, metric_crs
 from modules.simulator import (LC_BUILDING, LC_GREEN, LC_STREET, LC_WATER, Raster,
                                build_raster, simulate_flood, simulate_rain, simulate_wind)
+from modules.hazards import simulate_earthquake, simulate_kaiju, simulate_tornado
 from modules.terrain_loader import DemGrid, flat_dem, load_dem
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
@@ -48,8 +50,27 @@ SETTINGS_DEFAULTS = {
     "wind_bft": 9,
     "model_lod": "LOD 1 – Klötzchenmodell",
     "model_color": "Einheitlich",
+    "rain_sewer": 20,
+    "quake_mw": 5.5,
+    "quake_dist_km": 15,
+    "quake_soil": "Mittel (Kies, fester Lehm)",
+    "tornado_ef": 3,
+    "tornado_heading": 60,
+    "tornado_offset": 0,
+    "kaiju_height": 80,
+    "kaiju_heading": 90,
+    "kaiju_offset": 0,
 }
+# Wertebereiche der Zahlen-Einstellungen (für Projektdateien)
+SETTINGS_LIMITS = {
+    "flood_gauge": (0.0, 10.0), "wind_dir": (0, 355), "wind_bft": (0, 12), "rain_sewer": (0, 60),
+    "quake_mw": (3.0, 8.0), "quake_dist_km": (1, 150), "tornado_ef": (0, 5), "tornado_heading": (0, 355),
+    "tornado_offset": (-400, 400), "kaiju_height": (20, 150), "kaiju_heading": (0, 355),
+    "kaiju_offset": (-400, 400),
+}
+DIRECTION_SETTINGS = {"wind_dir", "tornado_heading", "kaiju_heading"}   # in 5°-Schritten
 RADIO_OPTIONS = {
+    "quake_soil": ["Fels", "Mittel (Kies, fester Lehm)", "Weich (Sand, Ton, Auen)"],
     "rain_display": ["Risiko-Index", "Wassertiefe in Senken", "Abflussbahnen"],
     "model_lod": ["LOD 1 – Klötzchenmodell", "LOD 2 – mit Dachformen"],
     "model_color": ["Einheitlich", "Gebäudehöhe", "Datenquelle der Höhe"],
@@ -134,7 +155,8 @@ def build_model(name: str, bbox: tuple, osm: OsmData, dem: DemGrid,
     raster = build_raster(bbox, crs, dem.sample, buildings, streets,
                           osm.green.to_crs(crs), osm.water.to_crs(crs))
     zmin = float(min(raster.corner_z.min(), ground.min() if len(ground) else np.inf))
-    key = "_".join(f"{v:.5f}" for v in bbox)
+    # eindeutig je Gebiet und Höhenquelle (andere Höhen = andere Ergebnisse)
+    key = "_".join(f"{v:.5f}" for v in bbox) + f"_{dem.source}"
     return Model(name, bbox, key, crs, osm, dem, buildings, buildings_wgs, streets, raster,
                  zmin, climate, climate_error)
 
@@ -217,8 +239,8 @@ def wind_presets(model: Model) -> dict:
 
 
 @st.cache_data(show_spinner="Starkregen wird berechnet …", max_entries=32)
-def cached_rain(model_key: str, rain_mm: float, _raster: Raster, n_buildings: int):
-    return simulate_rain(_raster, n_buildings, rain_mm)
+def cached_rain(model_key: str, rain_mm: float, sewer_mm: float, _raster: Raster, n_buildings: int):
+    return simulate_rain(_raster, n_buildings, rain_mm, sewer_mm)
 
 
 @st.cache_data(show_spinner="Wind wird berechnet …", max_entries=64)
@@ -239,7 +261,70 @@ def current_rain(model: Model):
     label = st.session_state.get("rain_scenario")
     if label not in scenarios:
         label = SETTINGS_DEFAULTS["rain_scenario"]
-    return cached_rain(model.key, scenarios[label], model.raster, len(model.buildings)), label
+    sewer = float(st.session_state.get("rain_sewer", SETTINGS_DEFAULTS["rain_sewer"]))
+    return cached_rain(model.key, scenarios[label], sewer, model.raster, len(model.buildings)), label
+
+
+@st.cache_data(show_spinner="Erdbeben wird berechnet …", max_entries=32)
+def cached_quake(model_key: str, magnitude: float, distance_km: float, soil: str, _buildings):
+    return simulate_earthquake(_buildings, magnitude, distance_km, soil)
+
+
+@st.cache_data(show_spinner="Tornado wird berechnet …", max_entries=32)
+def cached_tornado(model_key: str, ef: int, heading: float, offset: float, _buildings, _raster):
+    return simulate_tornado(_buildings, _raster, ef, heading, offset)
+
+
+@st.cache_data(show_spinner="Das Monster läuft los …", max_entries=32)
+def cached_kaiju(model_key: str, height: float, heading: float, offset: float, _buildings, _raster):
+    return simulate_kaiju(_buildings, _raster, height, heading, offset)
+
+
+def _setting(key: str):
+    return st.session_state.get(key, SETTINGS_DEFAULTS[key])
+
+
+def current_quake(model: Model):
+    return cached_quake(model.key, float(_setting("quake_mw")), float(_setting("quake_dist_km")),
+                        str(_setting("quake_soil")), model.buildings)
+
+
+def current_tornado(model: Model):
+    return cached_tornado(model.key, int(_setting("tornado_ef")), float(_setting("tornado_heading")),
+                          float(_setting("tornado_offset")), model.buildings, model.raster)
+
+
+def current_kaiju(model: Model):
+    return cached_kaiju(model.key, float(_setting("kaiju_height")), float(_setting("kaiju_heading")),
+                        float(_setting("kaiju_offset")), model.buildings, model.raster)
+
+
+# Schadensgrad 0..5 -> Farbe (0 = Grau wie unbeschädigte Gebäude)
+DAMAGE_COLORS = [GREY, (250, 222, 100), (246, 162, 62), (226, 88, 46), (178, 30, 42), (84, 18, 32)]
+
+
+def damage_colors(damage) -> np.ndarray:
+    damage = np.clip(np.asarray(damage, dtype=float), 0, 5)
+    stops = np.array(DAMAGE_COLORS, dtype=float)
+    low = np.minimum(np.floor(damage).astype(int), 4)
+    t = (damage - low)[:, None]
+    return stops[low] * (1 - t) + stops[low + 1] * t
+
+
+def damage_legend() -> str:
+    from modules.hazards import DAMAGE_NAMES
+    return legend_swatches([(f"{g} {DAMAGE_NAMES[g]}", DAMAGE_COLORS[g]) for g in range(1, 6)])
+
+
+def damage_tooltips(model: Model, damage, prefix: str = "") -> list:
+    from modules.hazards import DAMAGE_NAMES
+    extra = []
+    for d in np.asarray(damage, dtype=float):
+        g = int(np.clip(round(d), 0, 5))
+        color = "#ffcc80" if g < 3 else "#ff8a80"
+        extra.append(f"<b style='color:{color}'>{prefix}Schadensgrad {g} – {DAMAGE_NAMES[g]}</b>"
+                     if g > 0 else f"{prefix}kein Schaden")
+    return building_tooltips(model, extra)
 
 
 def current_wind(model: Model):
@@ -277,7 +362,7 @@ def read_project_file(raw: bytes) -> dict:
 
 def _clean_settings(raw: dict) -> dict:
     """Übernimmt nur bekannte Einstellungen mit passendem Typ und gültigem Wertebereich."""
-    limits = {"flood_gauge": (0.0, 10.0), "wind_dir": (0, 355), "wind_bft": (0, 12)}
+    limits = SETTINGS_LIMITS
     clean = {}
     for key, default in SETTINGS_DEFAULTS.items():
         value = raw.get(key) if isinstance(raw, dict) else None
@@ -287,7 +372,12 @@ def _clean_settings(raw: dict) -> dict:
         elif isinstance(default, (int, float)) and isinstance(value, (int, float)) and not isinstance(value, bool):
             low, high = limits[key]
             value = min(max(value, low), high)
-            clean[key] = int(round(value / 5) * 5) if key == "wind_dir" else type(default)(value)
+            if key in DIRECTION_SETTINGS:
+                clean[key] = int(round(value / 5) * 5) % 360
+            elif isinstance(default, int):
+                clean[key] = int(round(value))
+            else:
+                clean[key] = round(float(value), 1)
     return clean
 
 
@@ -362,15 +452,47 @@ def building_tooltips(model: Model, extra: list | None = None) -> list:
     return tips
 
 
-def base_layers(model: Model, overlay=None, ramp: str = "heat") -> list:
-    return [
-        viewer_3d.terrain_layer(model.raster, model.zmin, overlay, ramp),
-        viewer_3d.street_layer(model.osm.streets, model.dem.sample, model.zmin),
-    ]
+def scene_origin(model: Model) -> tuple[float, float, float]:
+    return vscene.origin_of(model.raster, model.zmin)
 
 
-def show_scene(layers: list, model: Model, key: str, height: int = 600):
-    st.pydeck_chart(viewer_3d.make_deck(layers, model.bbox), height=height, key=key)
+@st.cache_resource(show_spinner="3D-Szene wird vorbereitet …", max_entries=8)
+def _terrain_scene(model_key: str, _model: Model) -> dict:
+    m = _model
+    return {
+        "terrain": vscene.terrain(m.raster, scene_origin(m)),
+        "texture": vscene.map_texture(m.raster, m.buildings, m.streets,
+                                      m.osm.green.to_crs(m.crs), m.osm.water.to_crs(m.crs)),
+        "walkways": vscene.walkways(m.streets, scene_origin(m), m.raster),
+    }
+
+
+@st.cache_resource(show_spinner="Gebäude werden vorbereitet …", max_entries=16)
+def _building_scene(model_key: str, lod: int, _model: Model) -> dict:
+    return vscene.buildings(_model.buildings, scene_origin(_model), lod, clip_raster=_model.raster)
+
+
+def scene_for(model: Model, *, lod: int = 1, colors=None, tips: list | None = None,
+              overlay=None, ramp: str = "heat", **layers) -> dict:
+    """Szene für den 3D-Viewer: Gelände + Gebäude, dazu Analyse-Ebenen.
+
+    ``overlay``  Raster 0..1 als Heatmap auf dem Gelände (Farbskala ``ramp``)
+    ``layers``   weitere Ebenen aus ``viewer_webgpu.scene`` (water, facades, paths, arrow)
+    """
+    data = {**_terrain_scene(model.key, model), "buildings": _building_scene(model.key, lod, model)}
+    if colors is not None:
+        data["building_colors"] = vscene.colors(colors)
+    data["building_tips"] = tips if tips is not None else building_tooltips(model)
+    if overlay is not None:
+        data["overlay"] = vscene.overlay(overlay, viewer_3d.color_ramp(overlay, ramp), raster=model.raster)
+    data.update({k: v for k, v in layers.items() if v is not None})
+    return data
+
+
+def show_scene(scene: dict, key: str, height: int = 600):
+    viewer_webgpu.show_scene(scene, key=key, height=height)
+    st.caption("Linke Maustaste: verschieben · rechte Taste: drehen und kippen · Rad: zoomen · "
+               "Gebäude überfahren für Details")
 
 
 def no_buildings(model: Model) -> bool:

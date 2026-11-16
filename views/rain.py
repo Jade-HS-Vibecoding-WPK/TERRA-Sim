@@ -5,11 +5,10 @@ from __future__ import annotations
 import numpy as np
 import streamlit as st
 
-from modules import viewer_3d
 from modules.simulator import LC_BUILDING, LC_WATER
-from views.common import (GREY, ORANGE, RADIO_OPTIONS, base_layers, building_tooltips, climate_info,
+from views.common import (GREY, ORANGE, RADIO_OPTIONS, building_tooltips, climate_info,
                           current_rain, legend_ramp, legend_swatches, num, page_header, rain_scenarios,
-                          show_scene)
+                          scene_for, show_scene)
 
 DISPLAYS = RADIO_OPTIONS["rain_display"]
 
@@ -29,6 +28,10 @@ def render():
         with st.container(border=True):
             st.markdown("**Szenario**")
             st.selectbox("Regenmenge", list(scenarios), key="rain_scenario")
+            st.slider("Kanalisation nimmt auf", 0, 60, step=5, format="%d l/m²", key="rain_sewer",
+                      help="So viel Regen leiten Kanäle und Fallrohre von Dächern, Straßen und Plätzen ab. "
+                           "Übliche Auslegung: Regen, wie er alle 2–5 Jahre vorkommt – etwa 15–25 l/m² "
+                           "in einer Stunde. 0 = ohne Kanalisation.")
             st.radio("Heatmap zeigt", DISPLAYS, key="rain_display")
             info = climate_info(model)
             if info and info.get("prcp_max_day"):
@@ -37,8 +40,9 @@ def render():
                            "Tage pro Jahr mit mindestens 20 l/m².")
         result, _ = current_rain(model)
         k = result.kpis
-        st.caption(f"Versiegelungsgrad des Gebiets: {k['sealed_share']:.0%} – "
-                   f"{k['runoff_coeff']:.0%} des Regens fließen oberflächlich ab.")
+        st.caption(f"Versiegelungsgrad des Gebiets: {k['sealed_share']:.0%}. Die Kanalisation nimmt "
+                   f"{num(k['sewer_m3'])} m³ auf, {k['runoff_coeff']:.0%} des Regens fließen oberflächlich "
+                   "ab. Dachwasser kommt über die Fallrohre neben dem Gebäude an.")
         if model.dem.source == "flach":
             st.warning("Ohne Geländehöhen gibt es kein Gefälle – das Ergebnis ist nicht aussagekräftig.")
 
@@ -58,19 +62,17 @@ def render():
     with right:
         c = st.columns(4)
         c[0].metric(f"Gebäude (von {k['buildings_total']})", num(k["buildings_affected"]),
-                    help="Gebäude mit Rückstau-Risiko: Am Gebäude sammeln sich mindestens 10 cm Wasser.")
+                    help="Gebäude mit Rückstau-Risiko: Neben dem Gebäude stehen mindestens 10 cm Wasser "
+                         "auf mindestens 25 m².")
         c[1].metric("Oberflächenabfluss", f"{num(k['runoff_m3'])} m³",
                     help=f"Von {num(k['rain_m3'])} m³ Niederschlag auf der Landfläche")
         c[2].metric("Wasser ≥ 10 cm", f"{num(k['ponding_area_m2'])} m²", help="Fläche, auf der das Wasser "
                     "mindestens 10 cm hoch steht")
         c[3].metric("Max. Wassertiefe", f"{num(k['max_ponding_m'], 2)} m")
-        layers = base_layers(model, overlay, ramp)
-        if len(b):
-            colors = np.where(result.affected[:, None], np.array(ORANGE, float), np.array(GREY, float))
-            extra = [f"<b style='color:#ffcc80'>Wasser am Gebäude: bis {d * 100:.0f} cm</b>" if hit else ""
-                     for d, hit in zip(result.building_depth, result.affected)]
-            layers += viewer_3d.building_layers(model.buildings_wgs, b, model.zmin, colors,
-                                                building_tooltips(model, extra), lod=1)
-        show_scene(layers, model, key="scene_rain", height=640)
+        colors = np.where(result.affected[:, None], np.array(ORANGE, float), np.array(GREY, float))
+        extra = [f"<b style='color:#ffcc80'>Wasser am Gebäude: bis {d * 100:.0f} cm</b>" if hit else ""
+                 for d, hit in zip(result.building_depth, result.affected)]
+        show_scene(scene_for(model, colors=colors, tips=building_tooltips(model, extra),
+                             overlay=overlay, ramp=ramp), key="scene_rain", height=640)
         st.html(legend)
         st.html(legend_swatches([("Gebäude mit Rückstau-Risiko", ORANGE), ("übrige Gebäude", GREY)]))
