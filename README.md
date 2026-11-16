@@ -4,7 +4,7 @@
 > Ein interaktives Web-Tool zur automatischen Generierung von 3D-Stadtmodellen (LOD 1–2) und zur heuristischen Simulation von Umweltkatastrophen (Hochwasser, Starkregen, Starkwind).
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![Framework](https://img.shields.io/badge/Streamlit-1.32%2B-FF4B4B)
+![Framework](https://img.shields.io/badge/Streamlit-1.40%2B-FF4B4B)
 ![GIS](https://img.shields.io/badge/Data-OpenStreetMap%20%7C%20SRTM-green)
 ![AI-Assisted](https://img.shields.io/badge/Built%20with-Claude%20Pro%20%2F%20Code-purple)
 
@@ -69,7 +69,74 @@ terra-sim/
 │   ├── map_selector.py        # 2D-Karte & Koordinaten-Auswahl
 │   ├── osm_fetcher.py         # Lädt Gebäude, Höhen, Straßen & Grünflächen
 │   ├── terrain_loader.py      # Lädt Geländehöhen (DEM)
-│   ├── mesh_builder.py        # Baut das 3D-Modell & exportiert DXF/OBJ
-│   └── simulator.py           # Berechnet Hochwasser-, Regen- und Wind-Effekte
+│   ├── mesh_builder.py        # Baut das 3D-Modell & exportiert DXF/OBJ/STL
+│   ├── simulator.py           # Berechnet Hochwasser-, Regen- und Wind-Effekte
+│   └── viewer_3d.py           # Zeichnet die 3D-Szene im Browser (pydeck)
 │
-└── assets/                    # Beispielbilder, Icons, CSS-Styling
+└── assets/                    # Beispielbilder, Icons, CSS-Styling (geplant)
+```
+
+---
+
+## 🚀 Schnellstart
+
+Voraussetzung: Python 3.10 oder neuer.
+
+```bash
+# 1. Virtuelle Umgebung anlegen und aktivieren
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+source .venv/bin/activate       # macOS / Linux
+
+# 2. Pakete installieren
+pip install -r requirements.txt
+
+# 3. App starten (öffnet sich im Browser unter http://localhost:8501)
+streamlit run app.py
+```
+
+In der App: links einen Beispielort wählen oder eine Adresse suchen, auf
+**Modell generieren** klicken und dann über **Ansicht** zwischen 3D-Modell,
+Hochwasser, Starkregen und Starkwind wechseln.
+
+> Die erste Abfrage eines Gebiets kann bis zu einer Minute dauern, wenn der
+> öffentliche OpenStreetMap-Server (Overpass) ausgelastet ist. Danach liegt
+> das Gebiet im lokalen Zwischenspeicher (`.cache/`) und lädt sofort.
+
+---
+
+## 🔌 Module einzeln verwenden
+
+Jedes Modul funktioniert ohne die App und ohne die anderen Module. Sie
+tauschen nur einfache Datentypen aus: eine Bounding-Box als Tupel
+`(west, south, east, north)`, Geodaten als `GeoDataFrame`, Raster als
+`numpy`-Arrays.
+
+```python
+from modules.map_selector import geocode_address, bbox_from_center
+from modules.osm_fetcher import fetch_osm, metric_crs
+from modules.terrain_loader import load_dem
+
+ort = geocode_address("Schlossplatz, Oldenburg")
+bbox = bbox_from_center(ort["lat"], ort["lon"], width_m=500)
+
+osm = fetch_osm(bbox)                    # Gebäude, Straßen, Grün, Wasser
+dem = load_dem(bbox)                     # Geländehöhen
+gebaeude = osm.buildings.to_crs(metric_crs(bbox))   # in Metern rechnen
+print(gebaeude[["building", "height_m", "height_source", "area_m2"]].head())
+```
+
+---
+
+## ⚠️ Grenzen der Simulation
+
+TERRA-Sim liefert **Ersteinschätzungen für den Entwurf**, keine Gutachten.
+
+* **Geländehöhen** stammen aus freien globalen Höhenmodellen (30–250 m
+  Auflösung, teils mit Gebäuden und Bäumen). In flachen Gebieten können sie
+  um mehrere Meter danebenliegen.
+* **Gebäudehöhen** sind in OpenStreetMap oft nicht erfasst und werden dann
+  aus der Geschosszahl oder dem Gebäudetyp geschätzt.
+* **Hochwasser:** Badewannen-Modell ohne Deiche, Fließwege und Zeitverlauf.
+* **Starkregen:** ohne Kanalisation und ohne zeitliche Dynamik.
+* **Starkwind:** geometrische Sichtlinien-Analyse, keine Strömungssimulation.

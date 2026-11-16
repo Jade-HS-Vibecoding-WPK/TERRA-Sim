@@ -1,0 +1,28 @@
+# TERRA-Sim – benötigte Python-Pakete (Python 3.10+)
+# Installation:  pip install -r requirements.txt
+
+# Frontend / UI
+streamlit>=1.40
+streamlit-folium>=0.20
+folium>=0.16
+
+# Geodaten & GIS
+osmnx>=2.0
+geopandas>=1.0
+shapely>=2.1
+pyproj>=3.6
+numpy>=1.26
+pandas>=2.0
+scipy>=1.11
+Pillow>=10.0
+
+# Topografie (Höhen-APIs)
+requests>=2.31
+
+# 3D-Visualisierung
+pydeck>=0.9
+plotly>=5.18
+
+# CAD / 3D-Export
+trimesh>=4.0
+ezdxf>=1.1
