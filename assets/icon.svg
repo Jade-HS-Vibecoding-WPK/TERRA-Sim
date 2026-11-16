@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="TERRA-Sim">
+  <title>TERRA-Sim</title>
+  <g transform="translate(2 2)">
+    <rect x="0" y="0" width="44" height="44" rx="10" fill="#0b6e74"/>
+    <path d="M6 31 L15 23 L22 28 L30 19 L38 26 L38 38 L6 38 Z" fill="#7fd1c7"/>
+    <rect x="12" y="25" width="6" height="13" fill="#ffffff"/>
+    <rect x="20" y="20" width="7" height="18" fill="#e9f7f5"/>
+    <rect x="29" y="23" width="5" height="15" fill="#ffffff"/>
+    <path d="M6 13 q4 -4 8 0 t8 0 t8 0 t8 0" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round"/>
+  </g>
+</svg>

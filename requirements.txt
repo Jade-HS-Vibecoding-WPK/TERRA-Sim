@@ -16,8 +16,9 @@ pandas>=2.0
 scipy>=1.11
 Pillow>=10.0
 
-# Topografie (Höhen-APIs)
+# Topografie (Höhen-APIs) & Klima
 requests>=2.31
+meteostat>=2.0
 
 # 3D-Visualisierung
 pydeck>=0.9

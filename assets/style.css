@@ -1,0 +1,73 @@
+/* TERRA-Sim – zusätzliches Styling für die Streamlit-Oberfläche.
+   Wird in views/common.py per st.html eingebunden. Farben passend zu
+   .streamlit/config.toml (Primärfarbe #0b6e74). */
+
+:root {
+  --terra-primary: #0b6e74;
+  --terra-primary-soft: #e3f3f2;
+  --terra-text: #0f2b2e;
+  --terra-muted: #5b6b6d;
+  --terra-border: #d9e2e2;
+  --terra-ok: #2e7d32;
+  --terra-ok-bg: #e7f4e8;
+  --terra-warn: #9a6400;
+  --terra-warn-bg: #fff3d6;
+  --terra-risk: #b3261e;
+  --terra-risk-bg: #fde7e5;
+}
+
+/* Etwas mehr Platz für die 3D-Ansicht */
+.block-container { padding-top: 2.2rem; padding-bottom: 2rem; max-width: 1500px; }
+
+/* Kopfzeile jeder Seite: Projekt › Ansicht */
+.terra-crumb { color: var(--terra-muted); font-size: 0.85rem; margin-bottom: -0.4rem; }
+.terra-crumb b { color: var(--terra-primary); font-weight: 600; }
+
+/* Schrittanzeige auf der Projekt-Seite */
+.terra-steps { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.3rem 0 1rem; }
+.terra-step { display: flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.8rem;
+  border-radius: 999px; border: 1px solid var(--terra-border); color: var(--terra-muted);
+  font-size: 0.88rem; background: #fff; }
+.terra-step .num { display: inline-flex; width: 1.35rem; height: 1.35rem; border-radius: 50%;
+  align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700;
+  background: var(--terra-border); color: var(--terra-text); }
+.terra-step.active { border-color: var(--terra-primary); color: var(--terra-text); font-weight: 600; }
+.terra-step.active .num { background: var(--terra-primary); color: #fff; }
+.terra-step.done .num { background: var(--terra-ok); color: #fff; }
+
+/* Navigation in der Seitenleiste */
+.terra-nav-title { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.72rem;
+  color: var(--terra-muted); margin: 0.9rem 0 0.1rem; font-weight: 600; }
+.terra-locked-hint { font-size: 0.8rem; color: var(--terra-muted); margin: 0.2rem 0 0.4rem; }
+
+/* Projektkarte in der Seitenleiste */
+.terra-project { border: 1px solid var(--terra-border); border-radius: 10px; padding: 0.6rem 0.75rem;
+  background: #fff; margin-bottom: 0.4rem; }
+.terra-project .name { font-weight: 700; color: var(--terra-text); }
+.terra-project .meta { font-size: 0.8rem; color: var(--terra-muted); line-height: 1.35; }
+
+/* Statusanzeige (Ampel) für Analysen */
+.terra-pill { display: inline-block; padding: 0.12rem 0.6rem; border-radius: 999px;
+  font-size: 0.78rem; font-weight: 600; }
+.terra-pill.ok { background: var(--terra-ok-bg); color: var(--terra-ok); }
+.terra-pill.warn { background: var(--terra-warn-bg); color: var(--terra-warn); }
+.terra-pill.risk { background: var(--terra-risk-bg); color: var(--terra-risk); }
+.terra-pill.none { background: #eef1f1; color: var(--terra-muted); }
+
+/* Analyse-Kacheln auf der Übersicht */
+.terra-tile-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.terra-tile-title { font-size: 1.05rem; font-weight: 700; color: var(--terra-text); }
+.terra-tile-scenario { color: var(--terra-muted); font-size: 0.84rem; margin: 0.15rem 0 0.4rem; }
+.terra-tile-value { font-size: 1.6rem; font-weight: 700; color: var(--terra-text); line-height: 1.2; }
+.terra-tile-sub { color: var(--terra-muted); font-size: 0.84rem; }
+
+/* Legenden unter der 3D-Ansicht */
+.terra-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1.1rem;
+  font-size: 0.82rem; color: var(--terra-muted); margin-top: 0.35rem; }
+.terra-legend .swatch { display: inline-block; width: 0.85rem; height: 0.85rem; border-radius: 3px;
+  margin-right: 0.35rem; vertical-align: -0.12rem; border: 1px solid rgba(0,0,0,0.12); }
+.terra-legend .ramp { display: inline-block; width: 150px; height: 0.7rem; border-radius: 3px;
+  vertical-align: -0.08rem; margin: 0 0.4rem; border: 1px solid rgba(0,0,0,0.12); }
+
+/* Quellenangaben */
+.terra-source { font-size: 0.78rem; color: var(--terra-muted); }
