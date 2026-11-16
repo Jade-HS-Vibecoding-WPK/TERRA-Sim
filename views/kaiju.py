@@ -34,6 +34,13 @@ def render():
             st.slider("Größe", 20, 150, step=5, format="%d m", key="kaiju_height")
             st.slider("Laufrichtung (wohin es läuft)", 0, 355, step=5, format="%d°", key="kaiju_heading")
             st.slider("Seitlicher Versatz des Wegs", -400, 400, step=10, format="%d m", key="kaiju_offset")
+        with st.container(border=True):
+            st.markdown("**Kampf**")
+            st.slider("Laserstrahlen aus den Augen", 0, 20, key="kaiju_lasers",
+                      help="Treffen zufällige Ziele neben dem Weg – gleiche Einstellungen, gleicher Ablauf.")
+            st.slider("Angreifende Hubschrauber", 0, 10, key="kaiju_helis",
+                      help="Sie umkreisen das Monster und feuern Raketen. Etwa 60 % werden abgeschossen und "
+                           "stürzen in die Stadt, Fehlschüsse treffen Gebäude.")
         result = current_kaiju(model)
         k = result.kpis
         h = k["height_m"]
@@ -49,14 +56,16 @@ def render():
         c[1].metric("Schwer beschädigt", num(k["heavy"] - k["destroyed"]), help="Schadensgrad 3–4")
         c[2].metric("BGF nicht nutzbar", f"{num(k['gfa_unusable_m2'])} m²",
                     help="Bruttogeschossfläche der Gebäude mit Schadensgrad 4–5 (geschätzt)")
-        c[3].metric("Höher als das Monster", num(k["taller_buildings"]),
-                    help="Gebäude, hinter denen man sich verstecken könnte")
+        c[3].metric("Hubschrauber abgeschossen", f"{k['helis_down']} von {k['helis']}" if k["helis"] else "–",
+                    help=f"{k['laser_shots']} Laserschüsse; {k['taller_buildings']} Gebäude sind höher als "
+                         "das Monster und bieten Deckung.")
         origin = scene_origin(model)
         extent = max(model.raster.nx, model.raster.ny) * model.raster.cell
         scene = scene_for(model, colors=damage_colors(result.damage), tips=damage_tooltips(model, result.damage),
                           overlay=result.overlay, ramp="heat", hazard=vscene.hazard("kaiju"),
                           monster=vscene.monster(result.extra["center"], origin, h,
-                                                 st.session_state.kaiju_heading, travel_m=1.3 * extent),
+                                                 st.session_state.kaiju_heading, travel_m=1.3 * extent,
+                                                 events=result.extra["events"], helis=k["helis"]),
                           building_scale=vscene.building_scale(collapse_scale(result.damage)))
         show_scene(scene, key="scene_kaiju", height=640)
         st.html(legend_ramp("heat", "Erschütterung", "Fußabdruck", "Weg des Monsters"))

@@ -13,6 +13,7 @@ import { pass, mrt, normalView, screenUV, sample, packNormalToRGB, unpackRGBToNo
 import { ssao } from 'three/addons/tsl/display/SSAONode.js';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { Crowd } from './people.js';
+import { Effects } from './effects.js';
 
 // ---------------------------------------------------------------------------
 // Streamlit-Protokoll (Komponenten-API v1, ohne Zusatzbibliothek)
@@ -66,6 +67,8 @@ const dynamic = new THREE.Group();        // Wasser, Fassaden, Pfeile …
 world.add(dynamic);                       // (so wackelt beim Erdbeben alles mit)
 scene.add(world);
 const crowd = new Crowd(THREE, world, (x, y) => groundAt(x, y));
+const fx = new Effects(THREE, world, (x, y) => groundAt(x, y), crowd);
+const counter = document.getElementById('counter');
 
 function skyTexture() {
   const c = document.createElement('canvas');
@@ -122,8 +125,11 @@ renderer.setAnimationLoop(() => {
   // Bewegte Dinge: Tornado, Monster, Menschen, Erdbeben
   const ctx = animateMovers(t);
   const shaking = shakeWorld(t);
-  if (crowd.active || state.movers.length || shaking) {
+  if (crowd.active || state.movers.length || shaking || fx.active) {
+    fx.update(dt, t, ctx);
     crowd.update(dt, t, ctx);
+    followNik();
+    if (fx.ufos.length) counter.textContent = `👽 Entführt: ${crowd.abducted}`;
     dirty = Math.max(dirty, 1);
   }
   if (dirty <= 0) return;
@@ -184,7 +190,7 @@ function animateMovers(t) {
       const phase = t * m.speed / (0.45 * m.size) * Math.PI;   // ein Schritt alle 0,45 Körperhöhen
       m.obj.userData.legs.forEach((leg, k) => { leg.rotation.x = Math.sin(phase + k * Math.PI) * 0.45; });
       m.obj.position.y += Math.abs(Math.sin(phase)) * 0.02 * m.size;
-      ctx.monster = { x, y, height: m.size };
+      ctx.monster = { x, y, height: m.size, u, obj: m.obj };
     }
   }
   return ctx;
@@ -659,8 +665,9 @@ function makeMonster(m) {
   const head = add(new THREE.SphereGeometry(0.12, 24, 16), skin, 0, 0.86, 0.1);
   head.scale.set(1, 0.85, 1.15);
   add(new THREE.BoxGeometry(0.14, 0.06, 0.12), skin, 0, 0.81, 0.2);                      // Schnauze
+  group.userData.eyes = [];
   for (const s of [-1, 1]) {
-    add(new THREE.SphereGeometry(0.022, 12, 8), glow, s * 0.05, 0.89, 0.205);
+    group.userData.eyes.push(add(new THREE.SphereGeometry(0.022, 12, 8), glow, s * 0.05, 0.89, 0.205));
     add(new THREE.ConeGeometry(0.025, 0.16, 6), crystal, s * 0.07, 1.0, 0.06, -0.4, 0, -s * 0.45);
     // Arme und leuchtende Schulterkristalle
     add(new THREE.CapsuleGeometry(0.045, 0.22, 6, 12), skin, s * 0.2, 0.58, 0.1, -0.9, 0, s * 0.25);
@@ -739,8 +746,32 @@ function restoreCamera() {
   } catch (e) { return false; }
 }
 
-document.getElementById('btn-reset').onclick = () => resetView(false);
-document.getElementById('btn-top').onclick = () => resetView(true);
+document.getElementById('btn-reset').onclick = () => { setFollow(false); resetView(false); };
+document.getElementById('btn-top').onclick = () => { setFollow(false); resetView(true); };
+
+// Nik folgen: Kamera fliegt zu Nik und bleibt an ihm dran (drehen und zoomen geht weiter)
+const nikButton = document.getElementById('btn-nik');
+const nikPos = new THREE.Vector3();
+function setFollow(on) {
+  state.follow = on && crowd.mesh.count > 0;
+  nikButton.classList.toggle('on', state.follow);
+  if (!state.follow) return;
+  crowd.nikPosition(nikPos);
+  const offset = camera.position.clone().sub(controls.target).normalize();
+  offset.y = Math.max(offset.y, 0.45);
+  camera.position.copy(nikPos).addScaledVector(offset.normalize(), 26);
+  controls.target.copy(nikPos);
+  controls.update();
+  invalidate(3);
+}
+function followNik() {
+  if (!state.follow) return;
+  crowd.nikPosition(nikPos);
+  const delta = nikPos.clone().sub(controls.target);
+  controls.target.add(delta);
+  camera.position.add(delta);
+}
+nikButton.onclick = () => setFollow(!state.follow);
 document.getElementById('compass').onclick = () => {
   // nach Norden drehen, Abstand und Neigung behalten
   const offset = camera.position.clone().sub(controls.target);
@@ -867,7 +898,13 @@ async function update(args) {
   state.tips = s.building_tips || [];
   await setOverlay(s.overlay);
   await buildDynamic(s);
-  if (newModel) crowd.setWalkways(s.walkways);
+  const wanted = s.people ? s.people.count : 300;
+  if (newModel) crowd.setWalkways(s.walkways, wanted);
+  else if (wanted !== crowd.wanted) crowd.setCount(wanted);
+  peopleButton.disabled = nikButton.disabled = crowd.mesh.count === 0;
+  if (crowd.mesh.count === 0) setFollow(false);
+  fx.configure(s.monster, s.ufos);
+  counter.style.display = s.ufos ? 'block' : 'none';
   state.hazard = s.hazard || null;
   crowd.setHazard(state.hazard, s.water ? s.water.level : null);
 
@@ -882,7 +919,7 @@ async function update(args) {
 }
 
 // Für die Fehlersuche in der Browser-Konsole: window.terra.camera usw.
-window.terra = { THREE, renderer, scene, camera, controls, sun, state, invalidate, crowd };
+window.terra = { THREE, renderer, scene, camera, controls, sun, state, invalidate, crowd, fx };
 
 let queue = Promise.resolve();
 window.addEventListener('message', (ev) => {

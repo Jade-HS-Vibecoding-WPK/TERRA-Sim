@@ -60,13 +60,20 @@ SETTINGS_DEFAULTS = {
     "kaiju_height": 80,
     "kaiju_heading": 90,
     "kaiju_offset": 0,
+    "kaiju_lasers": 6,
+    "kaiju_helis": 4,
+    "people_count": 300,
+    "alien_ufos": 2,
+    "alien_size": 30,
+    "alien_height": 60,
 }
 # Wertebereiche der Zahlen-Einstellungen (für Projektdateien)
 SETTINGS_LIMITS = {
     "flood_gauge": (0.0, 10.0), "wind_dir": (0, 355), "wind_bft": (0, 12), "rain_sewer": (0, 60),
     "quake_mw": (3.0, 8.0), "quake_dist_km": (1, 150), "tornado_ef": (0, 5), "tornado_heading": (0, 355),
     "tornado_offset": (-400, 400), "kaiju_height": (20, 150), "kaiju_heading": (0, 355),
-    "kaiju_offset": (-400, 400),
+    "kaiju_offset": (-400, 400), "kaiju_lasers": (0, 20), "kaiju_helis": (0, 10),
+    "people_count": (0, 1000), "alien_ufos": (1, 5), "alien_size": (10, 80), "alien_height": (25, 150),
 }
 DIRECTION_SETTINGS = {"wind_dir", "tornado_heading", "kaiju_heading"}   # in 5°-Schritten
 RADIO_OPTIONS = {
@@ -276,8 +283,9 @@ def cached_tornado(model_key: str, ef: int, heading: float, offset: float, _buil
 
 
 @st.cache_data(show_spinner="Das Monster läuft los …", max_entries=32)
-def cached_kaiju(model_key: str, height: float, heading: float, offset: float, _buildings, _raster):
-    return simulate_kaiju(_buildings, _raster, height, heading, offset)
+def cached_kaiju(model_key: str, height: float, heading: float, offset: float, lasers: int, helis: int,
+                 _buildings, _raster):
+    return simulate_kaiju(_buildings, _raster, height, heading, offset, lasers, helis)
 
 
 def _setting(key: str):
@@ -296,7 +304,8 @@ def current_tornado(model: Model):
 
 def current_kaiju(model: Model):
     return cached_kaiju(model.key, float(_setting("kaiju_height")), float(_setting("kaiju_heading")),
-                        float(_setting("kaiju_offset")), model.buildings, model.raster)
+                        float(_setting("kaiju_offset")), int(_setting("kaiju_lasers")),
+                        int(_setting("kaiju_helis")), model.buildings, model.raster)
 
 
 # Schadensgrad 0..5 -> Farbe (0 = Grau wie unbeschädigte Gebäude)
@@ -486,6 +495,7 @@ def scene_for(model: Model, *, lod: int = 1, colors=None, tips: list | None = No
     if overlay is not None:
         data["overlay"] = vscene.overlay(overlay, viewer_3d.color_ramp(overlay, ramp), raster=model.raster)
     data.update({k: v for k, v in layers.items() if v is not None})
+    data["people"] = {"count": int(st.session_state.get("people_count", SETTINGS_DEFAULTS["people_count"]))}
     return data
 
 

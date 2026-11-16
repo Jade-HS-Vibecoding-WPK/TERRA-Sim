@@ -1,7 +1,7 @@
 # 🌍 TERRA-Sim – 3D Terrain, Environment & Resilience Simulator
 
 > **Dozenten-Referenzprojekt & Open-Source Boilerplate**  
-> Ein interaktives Web-Tool zur automatischen Generierung von 3D-Stadtmodellen (LOD 1–2) und zur heuristischen Simulation von Katastrophen (Hochwasser, Starkregen, Starkwind, Erdbeben, Tornado – und als Planspiel ein Kaiju-Angriff).
+> Ein interaktives Web-Tool zur automatischen Generierung von 3D-Stadtmodellen (LOD 1–2) und zur heuristischen Simulation von Katastrophen (Hochwasser, Starkregen, Starkwind, Erdbeben, Tornado – und als Planspiele ein Kaiju-Angriff und eine Alien-Invasion).
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Framework](https://img.shields.io/badge/Streamlit-1.40%2B-FF4B4B)
@@ -68,11 +68,16 @@ Die **Übersicht** zeigt Gebietskennzahlen (GRZ, GFZ, Versiegelung, Grünanteil)
 
 ### 7. 👾 Modul F: Kaiju-Angriff (Planspiel)
 * Ein Riesenmonster (eigene Figur, 20–150 m) läuft quer durch das Gebiet: Schneise, Reichweite von Schwanz und Armen, Erschütterung der Schritte.
+* **Kampf:** Das Monster feuert Laserstrahlen aus den Augen, Hubschrauber greifen mit Raketen an. Abgeschossene Hubschrauber stürzen in die Stadt, Fehlschüsse treffen Gebäude – alles mit festem Zufall, damit Bild und Schadensbilanz zusammenpassen.
 * Zeigt spielerisch, wie man eine Gefahr mit Weg, Reichweite und Schadensstufen modelliert – und welche Gebäude Deckung bieten.
 
+### 8. 🛸 Modul G: Alien-Invasion (Planspiel)
+* 1–5 UFOs kreuzen über dem Gebiet, bleiben stehen und holen Menschen mit dem Traktorstrahl hoch; die 3D-Ansicht zählt die Entführungen live mit. Gebäude bleiben heil.
+
 ### Animation: Menschen im Gebiet
-* Kleine Figuren laufen auf Straßen und Wegen und reagieren auf die gewählte Gefahr: Beim Orkan werden sie weggeweht, der Tornado saugt sie hoch, vor dem Monster fliehen sie, beim Erdbeben stürzen sie, im Hochwasser schwimmen sie.
-* Tornado und Monster ziehen animiert über ihre Bahn; beim Erdbeben wackelt das ganze Modell wie auf einem Rütteltisch. Mit dem Knopf **Menschen** lässt sich die Animation abschalten.
+* Bis zu 1.000 kleine Figuren (Anzahl in der Seitenleiste, 0 = aus) laufen auf Straßen und Wegen und reagieren auf die gewählte Gefahr: Beim Orkan werden sie weggeweht, der Tornado saugt sie hoch, vor dem Monster fliehen sie, Explosionen schleudern sie weg, UFOs holen sie ab, beim Erdbeben stürzen sie, im Hochwasser schwimmen sie.
+* Die Figur mit dem Afro und dem Namensschild ist **Nik**. Der Knopf **Nik folgen** in der 3D-Ansicht zoomt auf ihn und hängt die Kamera an ihn – auch wenn er durch die Luft fliegt.
+* Tornado, Monster, Hubschrauber und UFOs bewegen sich; beim Erdbeben wackelt das ganze Modell wie auf einem Rütteltisch. Mit dem Knopf **Menschen** lässt sich die Animation anhalten.
 
 ---
 
@@ -110,7 +115,7 @@ terra-sim/
 │   ├── hazards.py             # Erdbeben, Tornado, Kaiju (Schadensgrad 0–5 je Gebäude)
 │   ├── viewer_webgpu/         # 3D-Ansicht der App: three.js mit WebGPU (Streamlit-Komponente)
 │   │   ├── scene.py           #   baut die Szene (Gelände, Gebäude, Analyse-Ebenen) – nur numpy
-│   │   └── frontend/          #   HTML + JavaScript (viewer.js rendert, people.js = Menschen)
+│   │   └── frontend/          #   viewer.js rendert, people.js = Menschen, effects.js = Laser, Hubschrauber, UFOs
 │   └── viewer_3d.py           # Einfache 3D-Szene mit pydeck (deck.gl) und Farbskalen
 │
 ├── views/                     # 🖥️ SEITEN DER OBERFLÄCHE (Streamlit)
@@ -121,7 +126,7 @@ terra-sim/
 │   ├── climate.py             # Klima am Standort
 │   ├── model3d.py             # 3D-Modell & Export
 │   ├── flood.py · rain.py · wind.py   # Wetter & Wasser
-│   └── earthquake.py · tornado.py · kaiju.py   # weitere Katastrophen
+│   └── earthquake.py · tornado.py · kaiju.py · alien.py   # weitere Katastrophen
 │
 └── assets/                    # Logo, Icon und CSS-Styling
 ```
@@ -209,7 +214,8 @@ TERRA-Sim liefert **Ersteinschätzungen für den Entwurf**, keine Gutachten.
 * **Erdbeben:** Die Bauweise wird aus dem OSM-Gebäudetyp geschätzt, Baujahr
   und Zustand sind unbekannt. Die Intensität ist im ganzen Gebiet gleich.
 * **Tornado und Kaiju:** einfache geometrische Modelle (Abstand zur Bahn),
-  keine Trümmerflug- oder Strömungsrechnung. Kaiju ist ein Planspiel.
+  keine Trümmerflug- oder Strömungsrechnung. Kaiju und Alien-Invasion sind
+  Planspiele; die animierten Menschen sind Darstellung, keine Personenstrom-Simulation.
 * **Starkwind:** geometrische Sichtlinien-Analyse, keine Strömungssimulation.
 * **3D-Ansicht:** Die Bibliothek three.js wird beim Öffnen aus dem Internet geladen
   (jsDelivr). Ohne Internet bleibt die 3D-Ansicht leer – die App braucht für

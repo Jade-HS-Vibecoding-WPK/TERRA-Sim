@@ -20,13 +20,14 @@ PAGES: dict = {}
 SECTIONS = [
     ("Standort", ["overview", "climate", "model"]),
     ("Wetter & Wasser", ["flood", "rain", "wind"]),
-    ("Weitere Katastrophen", ["quake", "tornado", "kaiju"]),
+    ("Weitere Katastrophen", ["quake", "tornado", "kaiju", "alien"]),
 ]
 
 
 def register() -> dict:
     """Legt alle Seiten an (bei jedem Durchlauf neu, das ist bei Streamlit üblich)."""
-    from views import climate, earthquake, flood, kaiju, model3d, overview, rain, setup, tornado, wind
+    from views import (alien, climate, earthquake, flood, kaiju, model3d, overview, rain, setup, tornado,
+                       wind)
 
     PAGES.clear()
     PAGES.update({
@@ -50,6 +51,8 @@ def register() -> dict:
                            url_path="tornado"),
         "kaiju": st.Page(kaiju.render, title="Kaiju-Angriff", icon=":material/pest_control:",
                          url_path="kaiju"),
+        "alien": st.Page(alien.render, title="Alien-Invasion", icon=":material/rocket:",
+                         url_path="aliens"),
     })
     return PAGES
 
@@ -101,6 +104,11 @@ def sidebar():
         if locked:
             st.html('<div class="terra-locked-hint">Wird freigeschaltet, sobald ein Projektgebiet '
                     'angelegt und geladen ist.</div>')
+        else:
+            st.html('<div class="terra-nav-title">Darstellung</div>')
+            st.slider("Menschen im Gebiet", 0, 1000, step=25, key="people_count",
+                      help="Animierte Figuren in der 3D-Ansicht, 0 = aus. Die mit dem Afro ist Nik – "
+                           "„Nik folgen“ in der 3D-Ansicht hängt die Kamera an ihn.")
 
         st.divider()
         current = get_model()

@@ -260,23 +260,76 @@ def simulate_tornado(buildings, raster, ef: int, heading_deg: float, offset_m: f
 # Modul F – Kaiju-Angriff (Planspiel)
 # ==========================================================================
 
-def simulate_kaiju(buildings, raster, height_m: float, heading_deg: float,
-                   offset_m: float = 0.0) -> HazardResult:
+def _kaiju_events(raster, center, forward, right, h: float, lasers: int, helis: int, seed: int) -> dict:
+    """Zufällige, aber wiederholbare Ereignisse des Kampfes (gleiche Einstellungen = gleicher Ablauf).
+
+    ``u`` ist die Stelle auf der Bahn (Meter ab Gebietsmitte), an der das Monster gerade steht.
+    """
+    rng = np.random.default_rng(seed)
+    extent = max(raster.nx, raster.ny) * raster.cell
+    events = {"lasers": [], "crashes": [], "misses": []}
+    for _ in range(lasers):
+        u = rng.uniform(-0.45, 0.45) * extent
+        side = rng.choice([-1.0, 1.0])
+        source = center + forward * u
+        target = source + forward * rng.uniform(0.1, 0.8) * h + right * side * rng.uniform(0.6, 2.2) * h
+        events["lasers"].append({"u": float(u), "source": source, "target": target})
+    for _ in range(helis):
+        if rng.random() < 0.6:          # Hubschrauber wird vom Laser getroffen und stürzt ab
+            u = rng.uniform(-0.4, 0.4) * extent
+            point = center + forward * (u + rng.uniform(-0.3, 0.6) * h) + right * rng.uniform(-1.6, 1.6) * h
+            events["crashes"].append({"u": float(u), "point": point})
+        for _ in range(2):              # Raketen, die das Monster verfehlen
+            u = rng.uniform(-0.45, 0.45) * extent
+            point = center + forward * (u + rng.uniform(0, 0.5) * h) + right * rng.uniform(-0.9, 0.9) * h
+            events["misses"].append({"u": float(u), "point": point})
+    return events
+
+
+def _event_damage(geoms, events: dict, h: float) -> np.ndarray:
+    """Zusätzlicher Schaden durch Laser, Abstürze und Fehlschüsse."""
+    damage = np.zeros(len(geoms))
+    for laser in events["lasers"]:
+        beam = shapely.LineString([laser["source"], laser["target"]])
+        d_beam = shapely.distance(geoms, beam)
+        d_hit = shapely.distance(geoms, shapely.Point(laser["target"]))
+        damage = np.maximum(damage, np.where(d_beam < 0.03 * h, 3.0, 0.0))
+        damage = np.maximum(damage, np.interp(d_hit, [0, 0.12 * h, 0.25 * h, 0.25 * h + 1e-6], [5, 5, 2, 0]))
+    for crash in events["crashes"]:
+        d = shapely.distance(geoms, shapely.Point(crash["point"]))
+        damage = np.maximum(damage, np.interp(d, [0, 12, 30, 30.001], [5, 5, 2, 0]))
+    for miss in events["misses"]:
+        d = shapely.distance(geoms, shapely.Point(miss["point"]))
+        damage = np.maximum(damage, np.interp(d, [0, 6, 15, 15.001], [4, 3, 1, 0]))
+    return damage
+
+
+def simulate_kaiju(buildings, raster, height_m: float, heading_deg: float, offset_m: float = 0.0,
+                   lasers: int = 6, helis: int = 4, seed: int | None = None) -> HazardResult:
     """Ein Riesenmonster der Höhe ``height_m`` läuft quer durch das Gebiet.
 
     * Schneise (Füße, Körper): halbe Breite 0,25 · Höhe -> zerstört (Grad 5)
     * Schwanz und Arme: bis 0,45 · Höhe -> Grad 3–4
     * Erschütterung der Schritte: bis 0,8 · Höhe -> Grad 1–2
+    * ``lasers`` Laserstrahlen aus den Augen: Brandspur Grad 3, Einschlag zerstört
+    * ``helis`` Hubschrauber greifen an: ~60 % werden abgeschossen und stürzen in
+      die Stadt, je zwei Raketen verfehlen das Monster und treffen Gebäude
     Gebäude, die höher sind als das halbe Monster, halten etwas mehr aus.
+    ``seed`` legt den Zufall fest (Standard: aus den Einstellungen abgeleitet).
     """
     line, center, forward, right = _track(raster, heading_deg, offset_m)
     h = float(height_m)
+    if seed is None:
+        seed = int(h * 1000 + heading_deg * 37 + offset_m * 11 + lasers * 101 + helis * 1009) % (2 ** 31)
+    events = _kaiju_events(raster, center, forward, right, h, int(lasers), int(helis), seed)
     if len(buildings):
-        d, _ = _signed_distance(buildings.geometry.values, line, center, right)
+        geoms = np.asarray(buildings.geometry.values)
+        d, _ = _signed_distance(geoms, line, center, right)
         damage = np.interp(d, [0, 0.25 * h, 0.25 * h + 1e-6, 0.45 * h, 0.8 * h, 0.8 * h + 1e-6],
                            [5, 5, 4, 3, 1, 0])
         sturdy = buildings["height_m"].to_numpy(float) > 0.5 * h
         damage = np.where(sturdy & (damage < 5), np.maximum(0, damage - 1), damage)
+        damage = np.maximum(damage, _event_damage(geoms, events, h))
     else:
         damage = np.zeros(0)
 
@@ -292,8 +345,15 @@ def simulate_kaiju(buildings, raster, height_m: float, heading_deg: float,
     foot = np.hypot(along - k * step, cell_d - foot_side) < 0.09 * h
     swath = np.clip(1 - np.abs(cell_d) / (0.8 * h), 0, 1) * 0.55
     overlay = np.where(foot, 1.0, swath)
+    # Krater von Laser-Einschlägen, Abstürzen und Raketen
+    impacts = ([(e["target"], 0.12 * h) for e in events["lasers"]]
+               + [(e["point"], 15.0) for e in events["crashes"]] + [(e["point"], 6.0) for e in events["misses"]])
+    for (px, py), radius in impacts:
+        overlay = np.maximum(overlay, np.clip(1 - np.hypot(gx - px, gy - py) / radius, 0, 1) ** 0.5)
 
     kpis = _damage_kpis(buildings, damage)
-    kpis.update({"height_m": h, "swath_m": 0.5 * h,
+    kpis.update({"height_m": h, "swath_m": 0.5 * h, "laser_shots": len(events["lasers"]),
+                 "helis": int(helis), "helis_down": len(events["crashes"]),
                  "taller_buildings": int((buildings["height_m"].to_numpy(float) > h).sum()) if len(buildings) else 0})
-    return HazardResult(damage, kpis, overlay, extra={"center": center, "forward": forward, "track": line})
+    return HazardResult(damage, kpis, overlay, extra={"center": center, "forward": forward, "track": line,
+                                                     "events": events})

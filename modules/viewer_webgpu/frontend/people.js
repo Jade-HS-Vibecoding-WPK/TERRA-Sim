@@ -13,7 +13,12 @@
 //
 // Koordinaten wie in scene.py: x = Osten, y = Norden (Meter); three.js: (x, Höhe, -y).
 
-const WALK = 0, FLY = 1, DOWN = 2, VORTEX = 3, FLEE = 4;
+//   alien    UFO-Strahl: sie schweben nach oben und verschwinden im UFO
+//
+// Person Nr. 0 ist Nik: gelbes Shirt, Afro und Namensschild.
+
+const WALK = 0, FLY = 1, DOWN = 2, VORTEX = 3, FLEE = 4, ABDUCT = 5, GONE = 6;
+const NIK_COLOR = 0xffc928;
 const BODY_HEIGHT = 1.75;
 const CLOTHES = [0x2f5d8a, 0xc0392b, 0x2e8b57, 0xe0a030, 0x6c4f9c, 0x34495e, 0xd35400, 0x16a085,
                  0x7f8c8d, 0xb03a6a, 0x1f3a5f, 0xf2f2f2];
@@ -32,7 +37,7 @@ export class Crowd {
       profile.push(new THREE.Vector2(Math.max(1e-4, r * Math.cos(a)), h - r + r * Math.sin(a)));
     }
     const geometry = new THREE.LatheGeometry(profile, 14);
-    this.max = 500;
+    this.max = 1000;
     this.mesh = new THREE.InstancedMesh(geometry, new THREE.MeshStandardMaterial({ roughness: 0.75 }), this.max);
     this.mesh.castShadow = true;
     this.mesh.frustumCulled = false;
@@ -55,10 +60,15 @@ export class Crowd {
     this.angle = new Float32Array(n); this.radius = new Float32Array(n);
     this.respawn = new Uint8Array(n);
 
+    this.target = new Int16Array(n);         // welches UFO jemanden hochholt
     this.lines = [];
     this.hazard = null;
     this.waterLevel = null;
     this.enabled = true;
+    this.wanted = 300;
+    this.abducted = 0;
+    this.nik = makeNik(THREE);
+    parent.add(this.nik);
     this._m = new THREE.Matrix4();
     this._q = new THREE.Quaternion();
     this._e = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -71,10 +81,43 @@ export class Crowd {
   setEnabled(on) {
     this.enabled = on;
     this.mesh.visible = on;
+    this.nik.visible = on && this.mesh.count > 0;
+  }
+
+  // Anzahl der Menschen (0 = aus); neue werden zufällig auf die Wege gesetzt
+  setCount(wanted) {
+    this.wanted = Math.max(0, Math.min(this.max, Math.round(wanted)));
+    const count = this.lines.length ? this.wanted : 0;
+    const color = new this.T.Color();
+    for (let i = this.mesh.count; i < count; i++) {
+      this.mesh.setColorAt(i, color.setHex(i === 0 ? NIK_COLOR : CLOTHES[i % CLOTHES.length]));
+      this.spawn(i);
+      this.write(i, 0);
+    }
+    this.mesh.count = count;
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.nik.visible = this.enabled && count > 0;
+  }
+
+  // Wo ist Nik gerade? (three.js-Koordinaten, Kopfhöhe)
+  nikPosition(target) {
+    return target.set(this.x[0], this.y[0] + BODY_HEIGHT, -this.z[0]);
+  }
+
+  // Druckwelle einer Explosion: wer in der Nähe ist, fliegt weg
+  blast(x, y, r) {
+    for (let i = 0; i < this.mesh.count; i++) {
+      if (this.mode[i] === GONE || this.mode[i] === ABDUCT) continue;
+      const dx = this.x[i] - x, dy = this.z[i] - y, d = Math.hypot(dx, dy);
+      if (d > r) continue;
+      const push = (1 - d / r) * 18 + 4;
+      this.launch(i, dx / (d || 1) * push, rand(6, 6 + push), dy / (d || 1) * push);
+    }
   }
 
   // Straßen und Wege: Liste von Linien [[x, y], ...]
-  setWalkways(lines) {
+  setWalkways(lines, wanted = this.wanted) {
     this.lines = [];
     let total = 0;
     for (const pts of lines || []) {
@@ -88,14 +131,9 @@ export class Crowd {
       this.lines.push({ pts, cum, length: cum[cum.length - 1], start: total - cum[cum.length - 1] });
     }
     this.total = total;
-    const count = this.lines.length ? Math.round(Math.min(this.max, Math.max(40, total / 9))) : 0;
-    this.mesh.count = count;
-    const color = new this.T.Color();
-    for (let i = 0; i < count; i++) {
-      this.mesh.setColorAt(i, color.setHex(CLOTHES[i % CLOTHES.length]));
-      this.spawn(i);
-    }
-    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    this.mesh.count = 0;
+    this.abducted = 0;
+    this.setCount(wanted);
   }
 
   setHazard(hazard, waterLevel) {
@@ -205,6 +243,25 @@ export class Crowd {
           }
           break;
         }
+        case ABDUCT: {                               // im UFO-Strahl nach oben schweben
+          const u = (ctx.ufos || [])[this.target[i]];
+          if (!u) { this.launch(i, 0, 0, 0); break; }
+          this.x[i] += (u.x - this.x[i]) * Math.min(1, dt * 0.8);
+          this.z[i] += (u.y - this.z[i]) * Math.min(1, dt * 0.8);
+          this.y[i] += dt * 5;
+          this.tilt[i] += dt * 1.5; this.roll[i] += dt * 2.2;
+          if (this.y[i] >= u.top) {
+            this.mode[i] = GONE;
+            this.timer[i] = rand(8, 16);
+            this.abducted += 1;
+          }
+          break;
+        }
+        case GONE: {
+          this.timer[i] -= dt;
+          if (this.timer[i] <= 0) this.spawn(i);       // neue Leute kommen nach
+          break;
+        }
         case DOWN: {
           this.y[i] = ground;
           this.timer[i] -= dt;
@@ -218,6 +275,12 @@ export class Crowd {
       this.write(i, time);
     }
     this.mesh.instanceMatrix.needsUpdate = true;
+    // Afro und Namensschild folgen Person Nr. 0
+    if (n > 0) {
+      this.mesh.getMatrixAt(0, this._m);
+      this.nik.matrix.copy(this._m);
+      this.nik.visible = this.enabled && this.mode[0] !== GONE;
+    }
   }
 
   windVector(h) {
@@ -230,6 +293,20 @@ export class Crowd {
   // Gefahr in der Nähe? -> fliehen, wegfliegen …
   react(i, h, ctx) {
     if (!h) return;
+    if (h.type === 'alien') {
+      (ctx.ufos || []).forEach((u, k) => {
+        if (!u.beaming || this.mode[i] === ABDUCT) return;
+        const d = Math.hypot(this.x[i] - u.x, this.z[i] - u.y);
+        if (d < u.r) {
+          this.mode[i] = ABDUCT;
+          this.target[i] = k;
+          this.respawn[i] = 1;
+        } else if (d < u.r * 3 && this.mode[i] === WALK) {
+          this.flee(i, u.x, u.y);
+        }
+      });
+      return;
+    }
     if (h.type === 'tornado' && ctx.funnel) {
       const f = ctx.funnel, d = Math.hypot(this.x[i] - f.x, this.z[i] - f.y);
       if (d < f.core * 1.3) {
@@ -302,7 +379,43 @@ export class Crowd {
     this._e.set(this.tilt[i], this.yaw[i], this.roll[i], 'YXZ');
     this._q.setFromEuler(this._e);
     this._p.set(this.x[i], this.y[i] + bob, -this.z[i]);
+    this._s.setScalar(this.mode[i] === GONE ? 1e-4 : 1);
     this._m.compose(this._p, this._q, this._s);
     this.mesh.setMatrixAt(i, this._m);
   }
+}
+
+// Nik: Afro (lockige Kugel) und Namensschild, folgen der Figur Nr. 0
+function makeNik(THREE) {
+  const group = new THREE.Group();
+  group.matrixAutoUpdate = false;
+  const afro = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 1),
+    new THREE.MeshStandardMaterial({ color: 0x2a1b12, roughness: 1, flatShading: true }));
+  afro.scale.set(1, 0.85, 1);
+  afro.position.y = BODY_HEIGHT - 0.02;
+  afro.castShadow = true;
+  // ein paar Locken obendrauf, damit es nach Afro aussieht
+  for (let k = 0; k < 10; k++) {
+    const a = (k / 10) * Math.PI * 2, b = 0.5 + (k % 3) * 0.3;
+    const curl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.14, 0), afro.material);
+    curl.position.set(Math.cos(a) * 0.34 * Math.cos(b), BODY_HEIGHT + Math.sin(b) * 0.3, Math.sin(a) * 0.34 * Math.cos(b));
+    group.add(curl);
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 96;
+  const g = canvas.getContext('2d');
+  g.fillStyle = 'rgba(11, 110, 116, 0.92)';
+  g.beginPath(); g.roundRect(8, 8, 240, 80, 40); g.fill();
+  g.fillStyle = '#fff'; g.font = 'bold 54px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('Nik', 128, 50);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, sizeAttenuation: false,
+                                                             depthTest: false, transparent: true }));
+  label.scale.set(0.08, 0.03, 1);
+  label.position.y = BODY_HEIGHT + 1.1;
+  label.renderOrder = 10;
+  group.add(afro, label);
+  group.visible = false;
+  return group;
 }

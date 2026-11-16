@@ -130,7 +130,13 @@ def render():
                      tornado.kpis, "tornado")
     with cols[2]:
         _damage_tile("👾 Kaiju-Angriff", f"{ss.kaiju_height} m groß, läuft nach "
-                     f"{wind_direction_label(ss.kaiju_heading)}", kaiju.kpis, "kaiju")
+                     f"{wind_direction_label(ss.kaiju_heading)} · {ss.kaiju_lasers} Laser, "
+                     f"{ss.kaiju_helis} Hubschrauber", kaiju.kpis, "kaiju")
+    cols = st.columns(3)
+    with cols[0]:
+        _tile("🛸 Alien-Invasion", f"{ss.alien_ufos} UFO{'s' if ss.alien_ufos > 1 else ''}, "
+              f"{ss.alien_size} m Durchmesser", f"{ss.people_count} Menschen im Gebiet",
+              "Entführungen zählt die 3D-Ansicht live mit", "none", "Planspiel", "alien")
 
     # ---- Klima ------------------------------------------------------------
     st.subheader("Klima am Standort")

@@ -20,6 +20,10 @@
     #toolbar button.on { background: #0b6e74; color: #fff; border-color: #0b6e74; }
     #badge { position: absolute; left: 10px; bottom: 8px; font-size: 11px; color: rgba(15,43,46,.6);
              background: rgba(255,255,255,.7); padding: 1px 7px; border-radius: 10px; z-index: 2; }
+    #toolbar button:disabled { opacity: .45; cursor: default; }
+    #counter { position: absolute; right: 10px; bottom: 8px; display: none; z-index: 2; font-size: 13px;
+               font-weight: 600; color: #fff; background: rgba(46, 125, 50, .9); padding: 3px 10px;
+               border-radius: 12px; }
     #compass { position: absolute; left: 12px; top: 10px; width: 38px; height: 38px; z-index: 2;
                border-radius: 50%; background: rgba(255,255,255,.85); border: 1px solid rgba(15,43,46,.15);
                cursor: pointer; }
@@ -49,10 +53,12 @@
     <div id="toolbar">
       <button id="btn-reset" title="Ausgangsansicht">Ansicht</button>
       <button id="btn-top" title="Von oben">Draufsicht</button>
-      <button id="btn-people" class="on" title="Menschen, die sich durch das Gebiet bewegen">Menschen</button>
+      <button id="btn-nik" title="Auf Nik zoomen und ihm folgen">Nik folgen</button>
+      <button id="btn-people" class="on" title="Menschen anhalten und ausblenden">Menschen</button>
       <button id="btn-shadow" class="on" title="Schatten und Umgebungsverdeckung">Schatten</button>
     </div>
     <div id="badge"></div>
+    <div id="counter"></div>
   </div>
   <script>
     // Fehlermeldung, falls three.js nicht geladen werden kann (z. B. offline)

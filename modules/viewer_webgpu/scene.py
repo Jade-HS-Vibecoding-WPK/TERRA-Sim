@@ -263,11 +263,30 @@ def funnel(center_xy, origin, core_m: float, height_m: float, heading_deg: float
 
 
 def monster(center_xy, origin, height_m: float, heading_deg: float, travel_m: float,
-            speed_ms: float | None = None) -> dict:
-    """Riesenmonster, das durch ``center_xy`` in Laufrichtung ``heading_deg`` läuft."""
-    return {"x": float(center_xy[0] - origin[0]), "y": float(center_xy[1] - origin[1]),
+            speed_ms: float | None = None, events: dict | None = None, helis: int = 0) -> dict:
+    """Riesenmonster, das durch ``center_xy`` in Laufrichtung ``heading_deg`` läuft.
+
+    ``events`` (aus ``hazards.simulate_kaiju``): Laserschüsse, Hubschrauber-Abstürze
+    und Fehlschüsse – jeweils mit der Bahnstelle ``u``, an der sie passieren.
+    """
+    ox, oy = origin[0], origin[1]
+
+    def local(p):
+        return [round(float(p[0] - ox), 2), round(float(p[1] - oy), 2)]
+
+    events = events or {"lasers": [], "crashes": [], "misses": []}
+    return {"x": float(center_xy[0] - ox), "y": float(center_xy[1] - oy),
             "height": float(height_m), "heading": float(heading_deg), "travel": float(travel_m),
-            "speed": float(speed_ms if speed_ms is not None else 0.15 * height_m)}
+            "speed": float(speed_ms if speed_ms is not None else 0.15 * height_m), "helis": int(helis),
+            "lasers": [{"u": e["u"], "target": local(e["target"])} for e in events["lasers"]],
+            "crashes": [{"u": e["u"], "point": local(e["point"])} for e in events["crashes"]],
+            "misses": [{"u": e["u"], "point": local(e["point"])} for e in events["misses"]]}
+
+
+def ufos(count: int, size_m: float, height_m: float, extent_m: float, seed: int = 7) -> dict:
+    """UFOs, die über dem Gebiet kreuzen und mit dem Traktorstrahl Menschen hochholen."""
+    return {"count": int(count), "size": float(size_m), "height": float(height_m),
+            "reach": 0.38 * float(extent_m), "speed": 1.0, "seed": int(seed)}
 
 
 def walkways(streets_m, origin, raster) -> list:
