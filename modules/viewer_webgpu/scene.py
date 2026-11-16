@@ -252,14 +252,15 @@ def building_scale(scale) -> str:
 
 
 def funnel(center_xy, origin, core_m: float, height_m: float, heading_deg: float,
-           travel_m: float, speed_ms: float = 15.0) -> dict:
+           travel_m: float, speed_ms: float = 15.0, vrot_ms: float = 40.0) -> dict:
     """Tornado-Trichter, der durch ``center_xy`` (metrisch) in Richtung ``heading_deg`` zieht.
 
-    Der Browser bewegt ihn in einer Schleife über ``travel_m`` Meter Bahn.
+    Der Browser bewegt ihn in einer Schleife über ``travel_m`` Meter Bahn;
+    ``vrot_ms`` ist die Drehgeschwindigkeit am Kernrand (für die Wirbelteilchen).
     """
     return {"x": float(center_xy[0] - origin[0]), "y": float(center_xy[1] - origin[1]),
             "core": float(core_m), "height": float(height_m), "heading": float(heading_deg),
-            "travel": float(travel_m), "speed": float(speed_ms)}
+            "travel": float(travel_m), "speed": float(speed_ms), "vrot": float(vrot_ms)}
 
 
 def monster(center_xy, origin, height_m: float, heading_deg: float, travel_m: float,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from modules.hazards import EF_GUST_MS, EF_PATH_WIDTH_M, collapse_scale
+from modules.hazards import EF_GUST_MS, EF_PATH_WIDTH_M, TRANSLATION_MS, collapse_scale
 from modules.viewer_webgpu import scene as vscene
 from views.common import (damage_colors, damage_legend, damage_tooltips, legend_ramp, no_buildings, num,
                           page_header, scene_for, scene_origin, show_scene, wind_direction_label)
@@ -59,7 +59,8 @@ def render():
         extent = max(raster.nx, raster.ny) * raster.cell
         funnel = vscene.funnel(result.extra["center"], origin, result.extra["core_m"],
                                min(900.0, max(300.0, 1.1 * extent)), st.session_state.tornado_heading,
-                               travel_m=1.4 * extent)
+                               travel_m=1.4 * extent, speed_ms=TRANSLATION_MS,
+                               vrot_ms=EF_GUST_MS[k["ef"]] - TRANSLATION_MS)
         scene = scene_for(model, colors=damage_colors(result.damage), tips=damage_tooltips(model, result.damage),
                           overlay=result.overlay, ramp="heat", funnel=funnel, hazard=vscene.hazard("tornado"),
                           building_scale=vscene.building_scale(collapse_scale(result.damage)))

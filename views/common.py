@@ -65,6 +65,7 @@ SETTINGS_DEFAULTS = {
     "people_count": 300,
     "wind_ground": "Wind in Fußgängerhöhe",
     "wind_flow": True,
+    "wind_arrow": True,
     "alien_ufos": 2,
     "alien_size": 30,
     "alien_height": 60,

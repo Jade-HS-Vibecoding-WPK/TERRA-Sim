@@ -14,7 +14,7 @@ import { ssao } from 'three/addons/tsl/display/SSAONode.js';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { Crowd } from './people.js';
 import { Effects } from './effects.js';
-import { FlowParticles } from './flow.js';
+import { FlowParticles, VortexParticles } from './flow.js';
 
 // ---------------------------------------------------------------------------
 // Streamlit-Protokoll (Komponenten-API v1, ohne Zusatzbibliothek)
@@ -70,6 +70,7 @@ scene.add(world);
 const crowd = new Crowd(THREE, world, (x, y) => groundAt(x, y));
 const fx = new Effects(THREE, world, (x, y) => groundAt(x, y), crowd);
 const flow = new FlowParticles(THREE, world, (x, y) => groundAt(x, y));
+const vortex = new VortexParticles(THREE, world, (x, y) => groundAt(x, y));
 crowd.flow = flow;
 fx.buildings = { lift: (i) => liftBuilding(i), restore: (list) => restoreBuildings(list) };
 const counter = document.getElementById('counter');
@@ -129,8 +130,9 @@ renderer.setAnimationLoop(() => {
   // Bewegte Dinge: Tornado, Monster, Menschen, Erdbeben
   const ctx = animateMovers(t);
   const shaking = shakeWorld(t);
-  if (crowd.active || state.movers.length || shaking || fx.active || flow.active) {
+  if (crowd.active || state.movers.length || shaking || fx.active || flow.active || vortex.active) {
     flow.update(dt);
+    vortex.update(dt, ctx.funnel);
     fx.update(dt, t, ctx);
     if (state.heightsDirty) { state.heightsDirty = false; applyHeights(); }
     crowd.update(dt, t, ctx);
@@ -960,6 +962,7 @@ async function update(args) {
   if (crowd.mesh.count === 0) setFollow(false);
   fx.configure(s.monster, s.ufos);
   await flow.set(s.flow || null);
+  vortex.set(s.funnel || null);
   counter.style.display = s.ufos ? 'block' : 'none';
   state.hazard = s.hazard || null;
   crowd.setHazard(state.hazard, s.water ? s.water.level : null);
@@ -975,7 +978,7 @@ async function update(args) {
 }
 
 // Für die Fehlersuche in der Browser-Konsole: window.terra.camera usw.
-window.terra = { THREE, renderer, scene, camera, controls, sun, state, invalidate, crowd, fx };
+window.terra = { THREE, renderer, scene, camera, controls, sun, state, invalidate, crowd, fx, flow, vortex };
 
 let queue = Promise.resolve();
 window.addEventListener('message', (ev) => {

@@ -6,6 +6,8 @@
 // zeigen. Eine zweite Schicht zieht ungestört über die Dächer.
 //
 // Koordinaten wie in scene.py: x = Osten, y = Norden; three.js: (x, Höhe, -y).
+//
+// VortexParticles: Staub und Trümmer, die um den Tornado-Trichter wirbeln.
 
 const RAMP = [[116, 196, 118], [255, 217, 79], [244, 109, 67], [165, 0, 38]];   // wie viewer_3d "wind"
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -138,5 +140,131 @@ export class FlowParticles {
     }
     this.mesh.instanceMatrix.needsUpdate = true;
     this.mesh.instanceColor.needsUpdate = true;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tornado: Wirbelteilchen
+// ---------------------------------------------------------------------------
+//
+// Gleicher Wirbel wie in hazards.tornado_speed (Rankine): innerhalb des Kerns
+// wächst die Drehgeschwindigkeit mit dem Abstand, außerhalb nimmt sie mit 1/r ab.
+// Am Boden strömen die Teilchen spiralförmig nach innen, im Trichter steigen sie
+// auf und weiten sich wie der Trichter. Drehsinn gegen den Uhrzeiger (Nordhalbkugel).
+
+const DUST = [[176, 160, 138], [140, 126, 110], [205, 192, 172]];
+const DEBRIS = [[92, 80, 70], [120, 98, 76], [70, 70, 74]];
+
+export class VortexParticles {
+  constructor(THREE, parent, groundAt) {
+    this.T = THREE;
+    this.groundAt = groundAt;
+    this.max = 1800;
+    this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ roughness: 1 }), this.max);
+    this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.max * 3).fill(1), 3);
+    this.mesh.frustumCulled = false;
+    this.mesh.castShadow = true;
+    this.mesh.count = 0;
+    parent.add(this.mesh);
+    const n = this.max;
+    this.r = new Float32Array(n); this.a = new Float32Array(n); this.h = new Float32Array(n);
+    this.age = new Float32Array(n); this.life = new Float32Array(n); this.kind = new Uint8Array(n);
+    this.size = new Float32Array(n); this.spin = new Float32Array(n);
+    this.spec = null;
+    this.key = null;
+    this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._p = new THREE.Vector3();
+    this._s = new THREE.Vector3(); this._d = new THREE.Vector3(); this._z = new THREE.Vector3(0, 0, 1);
+    this._e = new THREE.Euler(); this._c = new THREE.Color();
+  }
+
+  get active() { return this.mesh.count > 0; }
+
+  set(funnel) {
+    const key = funnel ? JSON.stringify([funnel.core, funnel.height, funnel.vrot]) : null;
+    if (key === this.key) return;
+    this.key = key;
+    this.spec = funnel || null;
+    if (!funnel) { this.mesh.count = 0; return; }
+    // mehr Teilchen bei stärkeren Tornados
+    const count = Math.min(this.max, Math.round(500 + (funnel.vrot || 40) * 18));
+    this.mesh.count = count;
+    for (let i = 0; i < count; i++) {
+      this.kind[i] = Math.random() < 0.22 ? 1 : 0;                  // 1 = Trümmer, 0 = Staub
+      const palette = this.kind[i] ? DEBRIS : DUST;
+      const c = palette[i % palette.length];
+      this.mesh.setColorAt(i, this._c.setRGB(c[0] / 255, c[1] / 255, c[2] / 255, this.T.SRGBColorSpace));
+      this.spawn(i, true);
+    }
+    this.mesh.instanceColor.needsUpdate = true;
+  }
+
+  // Radius des Trichters in einer Höhe – wie die Wolkenhülle in viewer.js
+  funnelRadius(h) {
+    const s = this.spec;
+    return s.core * (0.35 + 1.6 * Math.pow(Math.min(1, Math.max(0, h / s.height)), 2.2));
+  }
+
+  spawn(i, anywhere = false) {
+    const s = this.spec;
+    const inColumn = anywhere ? Math.random() < 0.6 : Math.random() < 0.3;
+    if (inColumn) {                                                 // schon im Trichter
+      this.h[i] = Math.random() * s.height * (this.kind[i] ? 0.35 : 0.9);
+      this.r[i] = this.funnelRadius(this.h[i]) * rand(0.6, 1.1);
+    } else {                                                        // vom Boden angesaugt
+      this.h[i] = rand(0.2, 6);
+      this.r[i] = s.core * rand(1.2, 4);
+    }
+    this.a[i] = Math.random() * Math.PI * 2;
+    this.age[i] = 0;
+    this.life[i] = rand(6, 14);
+    this.size[i] = this.kind[i] ? rand(0.8, 2.6) : rand(0.5, 1.4);
+    this.spin[i] = rand(-6, 6);
+  }
+
+  update(dt, center) {
+    const s = this.spec;
+    if (!s || !center) return;
+    const vrot = s.vrot || 40, core = s.core, H = s.height;
+    const ground = this.groundAt(center.x, center.y);
+    const n = this.mesh.count;
+    for (let i = 0; i < n; i++) {
+      const r = Math.max(1, this.r[i]);
+      // Drehgeschwindigkeit (Rankine) – innen wie ein starrer Körper, außen ~1/r
+      const vt = r < core ? vrot * r / core : vrot * core / r;
+      this.a[i] += (vt / r) * dt;
+      const nearGround = this.h[i] < 12;
+      if (nearGround && r > core * 0.6) {
+        this.r[i] -= vt * 0.35 * dt;                                // am Boden nach innen
+        this.h[i] += dt * (r < core * 1.4 ? 6 : 0.6);
+      } else {
+        const lift = (this.kind[i] ? 0.18 : 0.32) * vrot;           // Trümmer steigen langsamer
+        this.h[i] += lift * dt;
+        this.r[i] += (this.funnelRadius(this.h[i]) * 0.9 - this.r[i]) * Math.min(1, dt * 0.8);
+      }
+      this.age[i] += dt;
+      // Trümmer werden oben hinausgeschleudert, Staub löst sich im Wolkenkragen auf
+      if (this.h[i] > H * (this.kind[i] ? 0.4 : 0.95) || this.age[i] > this.life[i]) {
+        if (this.kind[i] && this.h[i] > H * 0.4) this.r[i] += vt * dt * 3;
+        if (this.r[i] > core * 6 || this.h[i] > H * 0.95 || this.age[i] > this.life[i]) this.spawn(i);
+      }
+      const x = center.x + Math.cos(this.a[i]) * this.r[i];
+      const y = center.y + Math.sin(this.a[i]) * this.r[i];
+      this._p.set(x, ground + this.h[i], -y);
+      if (this.kind[i]) {                                           // Trümmer: taumelnde Brocken
+        this._e.set(this.age[i] * this.spin[i], this.age[i] * this.spin[i] * 0.7, this.age[i] * 0.5);
+        this._q.setFromEuler(this._e);
+        this._s.setScalar(this.size[i]);
+      } else {                                                      // Staub: Strich in Drehrichtung
+        this._d.set(-Math.sin(this.a[i]), 0.15, -Math.cos(this.a[i]));
+        this._q.setFromUnitVectors(this._z, this._d.normalize());
+        const fade = Math.sin(Math.PI * Math.min(1, this.age[i] / this.life[i]));
+        const thick = this.size[i] * (0.4 + 0.6 * fade);
+        this._s.set(thick, thick, Math.min(14, 1 + vt * 0.25));
+      }
+      this._m.compose(this._p, this._q, this._s);
+      this.mesh.setMatrixAt(i, this._m);
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
   }
 }

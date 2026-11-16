@@ -56,7 +56,7 @@ Die **Übersicht** zeigt Gebietskennzahlen (GRZ, GFZ, Versiegelung, Grünanteil)
 * Einstellung von Windrichtung (360°-Kompass) und Windstärke (Beaufort-Skala).
 * Geometrische Expositions- und Sichtlinienanalyse (Raycasting light) statt rechenintensiver CFD-Strömungsmechanik.
 * **Live-Auswertung:** Markierung ungeschützter, hochbelasteter Fassadenflächen sowie enger Straßenschluchten mit Düseneffekt (Venturi-Effekt).
-* **Luftströmung am Boden:** Strömungsfeld in 2 m Höhe aus Potentialströmung um die Gebäude (Beschleunigung an Ecken und in Lücken) und Windschatten hinter den Gebäuden. Als Heatmap „Wind in Fußgängerhöhe“ oder „Windschatten“, mit Kennzahlen (gefährlich windige Flächen ab 54 km/h, Anteil im Windschatten) und als **animierte Windteilchen**, die durch die Straßen und über die Dächer fließen.
+* **Luftströmung am Boden:** Strömungsfeld in 2 m Höhe aus Potentialströmung um die Gebäude (Beschleunigung an Ecken und in Lücken) und Windschatten hinter den Gebäuden. Als Heatmap „Wind in Fußgängerhöhe“ oder „Windschatten“, mit Kennzahlen (gefährlich windige Flächen ab 54 km/h, Anteil im Windschatten) und als **animierte Windteilchen**, die durch die Straßen und über die Dächer fließen. Der blaue Windpfeil lässt sich ausschalten.
 
 ### 5. 🫨 Modul D: Erdbeben
 * Magnitude, Entfernung zum Epizentrum und Untergrund wählen; Vorlagen von „spürbar“ bis „extrem“ (u. a. wie Roermond 1992).
@@ -66,6 +66,7 @@ Die **Übersicht** zeigt Gebietskennzahlen (GRZ, GFZ, Versiegelung, Grünanteil)
 ### 6. 🌪️ Modul E: Tornado
 * Stärke nach Enhanced-Fujita-Skala (EF0–EF5), Zugrichtung und Lage der Bahn.
 * Wirbel nach Rankine plus Zuggeschwindigkeit (rechts der Bahn stärker); Schaden je Gebäude aus der Windgeschwindigkeit, leichte Bauten früher, Stahlbeton später.
+* **Animation:** Der Trichter zieht über die Bahn; Staub und Trümmer werden am Boden spiralförmig angesaugt, steigen im Trichter auf (gleicher Wirbel wie in der Rechnung, Drehsinn gegen den Uhrzeiger) und werden oben hinausgeschleudert.
 
 ### 7. 👾 Modul F: Kaiju-Angriff (Planspiel)
 * Ein Riesenmonster (eigene Figur, 20–150 m) läuft quer durch das Gebiet: Schneise, Reichweite von Schwanz und Armen, Erschütterung der Schritte.
@@ -117,7 +118,7 @@ terra-sim/
 │   ├── hazards.py             # Erdbeben, Tornado, Kaiju (Schadensgrad 0–5 je Gebäude)
 │   ├── viewer_webgpu/         # 3D-Ansicht der App: three.js mit WebGPU (Streamlit-Komponente)
 │   │   ├── scene.py           #   baut die Szene (Gelände, Gebäude, Analyse-Ebenen) – nur numpy
-│   │   └── frontend/          #   viewer.js rendert, people.js = Menschen, flow.js = Windteilchen,
+│   │   └── frontend/          #   viewer.js rendert, people.js = Menschen, flow.js = Wind- und Tornado-Teilchen,
 │   │                          #   effects.js = Laser, Hubschrauber, UFOs, Mutterschiff
 │   └── viewer_3d.py           # Einfache 3D-Szene mit pydeck (deck.gl) und Farbskalen
 │

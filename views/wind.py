@@ -79,6 +79,8 @@ def render():
             st.markdown("**Szenario**")
             st.slider("Windrichtung (woher der Wind kommt)", 0, 355, step=5, format="%d°", key="wind_dir")
             st.slider("Windstärke (Beaufort)", 0, 12, key="wind_bft")
+            st.toggle("Windpfeil anzeigen", key="wind_arrow",
+                      help="Der blaue Pfeil über der Szene zeigt, wohin der Wind weht.")
             result, direction, beaufort = current_wind(model)
             k = result.kpis
             st.caption(f"Wind aus **{wind_direction_label(direction)}** · **{BEAUFORT_NAMES[beaufort]}**, "
@@ -134,7 +136,8 @@ def render():
             upper = beaufort_to_ms(beaufort) * (max(10.0, top + 10) / 10.0) ** WIND_PROFILE_EXPONENT
             flow = vscene.flow(field, model.raster, origin, top, upper, direction, fk["free_ped_ms"])
         scene = scene_for(model, colors=np.tile(np.array(GREY, float), (len(b), 1)), facades=facades,
-                          paths=venturi, arrow=vscene.wind_arrow(direction, top + 15),
+                          paths=venturi,
+                          arrow=vscene.wind_arrow(direction, top + 15) if st.session_state.wind_arrow else None,
                           overlay=overlay, ramp=ramp, flow=flow,
                           hazard=vscene.hazard("wind", bft=beaufort, from_deg=direction))
         show_scene(scene, key="scene_wind", height=640)
@@ -143,6 +146,7 @@ def render():
         elif ground_mode == "Windschatten":
             st.html(legend_ramp("water", "kein Schatten", "tiefer Windschatten", "Windschatten"))
         st.html(legend_ramp("wind", "geschützt", "frei angeströmt", "Fassaden"))
-        st.html(legend_swatches([("Gasse mit Düseneffekt", VENTURI_COLOR), ("Windrichtung", (30, 100, 200))]
+        st.html(legend_swatches([("Gasse mit Düseneffekt", VENTURI_COLOR)]
+                                + ([("Windrichtung", (30, 100, 200))] if st.session_state.wind_arrow else [])
                                 + ([("Windteilchen: Farbe = Geschwindigkeit", (244, 109, 67))] if flow else [])))
     no_buildings(model)
