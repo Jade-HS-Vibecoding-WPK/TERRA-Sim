@@ -9,6 +9,7 @@ from modules.viewer_webgpu import scene as vscene
 from views.common import (damage_colors, damage_legend, damage_tooltips, legend_ramp, no_buildings, num,
                           page_header, scene_for, scene_origin, show_scene, wind_direction_label)
 from views.common import current_tornado
+from views.common import card, kpi_row, odds_card
 
 PRESETS = {
     "Häufig · EF1": 1,
@@ -32,25 +33,26 @@ def render():
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:
-        with st.container(border=True):
+        with card():
             st.markdown("**Szenario**")
             for label, ef in PRESETS.items():
                 st.button(label, key=f"tornado_{label}", width="stretch", on_click=_apply, args=(ef,))
             st.caption("In Deutschland gibt es jedes Jahr etwa 20–60 Tornados, meist schwach (EF0–EF1). "
                        "Sie ziehen meist von Südwest nach Nordost.")
-        with st.container(border=True):
+        with card():
             st.slider("Stärke (Enhanced-Fujita-Skala)", 0, 5, format="EF%d", key="tornado_ef")
             st.slider("Zugrichtung (wohin er zieht)", 0, 355, step=5, format="%d°", key="tornado_heading")
             st.slider("Seitlicher Versatz der Bahn", -400, 400, step=10, format="%d m", key="tornado_offset")
         result = current_tornado(model)
         k = result.kpis
+        odds_card(model, "tornado", "Chance, dass ein Tornado dieser Stärke oder stärker das Gebiet streift.")
         st.caption(f"EF{k['ef']}: Spitzenböen um {num(k['gust_ms'] * 3.6)} km/h, Schneise etwa "
                    f"{num(k['path_width_m'])} m breit. Zieht nach "
                    f"**{wind_direction_label(st.session_state.tornado_heading)}**; rechts der Bahn ist "
                    "der Wind stärker, weil sich die Zuggeschwindigkeit addiert.")
 
     with right:
-        c = st.columns(4)
+        c = kpi_row(4)
         c[0].metric(f"Beschädigt (von {k['buildings_total']})", num(k["damaged"]))
         c[1].metric("Schwer beschädigt", num(k["heavy"]), help="Schadensgrad 3 oder mehr: Dachstuhl weg, Wände beschädigt")
         c[2].metric("Zerstört", num(k["destroyed"]))

@@ -9,6 +9,7 @@ from modules.viewer_webgpu import scene as vscene
 from views.common import (damage_colors, damage_legend, damage_tooltips, legend_ramp, no_buildings, num,
                           page_header, scene_for, scene_origin, show_scene, wind_direction_label)
 from views.common import current_kaiju
+from views.common import card, kpi_row, odds_card
 
 PRESETS = {"Jungtier · 30 m": 30, "Ausgewachsen · 80 m": 80, "Titan · 150 m": 150}
 
@@ -26,15 +27,15 @@ def render():
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:
-        with st.container(border=True):
+        with card():
             st.markdown("**Monster**")
             for label, height in PRESETS.items():
                 st.button(label, key=f"kaiju_{label}", width="stretch", on_click=_apply, args=(height,))
-        with st.container(border=True):
+        with card():
             st.slider("Größe", 20, 150, step=5, format="%d m", key="kaiju_height")
             st.slider("Laufrichtung (wohin es läuft)", 0, 355, step=5, format="%d°", key="kaiju_heading")
             st.slider("Seitlicher Versatz des Wegs", -400, 400, step=10, format="%d m", key="kaiju_offset")
-        with st.container(border=True):
+        with card():
             st.markdown("**Kampf**")
             st.slider("Laserstrahlen aus den Augen", 0, 20, key="kaiju_lasers",
                       help="Treffen zufällige Ziele neben dem Weg – gleiche Einstellungen, gleicher Ablauf.")
@@ -50,8 +51,10 @@ def render():
         st.caption("Ein Spaß-Szenario für die Lehre – es zeigt, wie man eine Gefahr mit Weg, Reichweite "
                    "und Schadensstufen modelliert. Das Monster ist eine eigene Figur.")
 
+        odds_card(model, "fiction")
+
     with right:
-        c = st.columns(4)
+        c = kpi_row(4)
         c[0].metric(f"Zerstört (von {k['buildings_total']})", num(k["destroyed"]))
         c[1].metric("Schwer beschädigt", num(k["heavy"] - k["destroyed"]), help="Schadensgrad 3–4")
         c[2].metric("BGF nicht nutzbar", f"{num(k['gfa_unusable_m2'])} m²",

@@ -1,9 +1,23 @@
+# Farbschema: überwiegend Grün; Rot und Lila nur für Risiken, Schäden und Fehler.
 [theme]
 base = "light"
-primaryColor = "#0b6e74"
-backgroundColor = "#f7f9f9"
-secondaryBackgroundColor = "#eef3f3"
-textColor = "#0f2b2e"
+primaryColor = "#1f7a4d"
+backgroundColor = "#f1f8f3"
+secondaryBackgroundColor = "#e2f1e7"
+textColor = "#10291d"
+linkColor = "#1f7a4d"
+borderColor = "#cfe5d6"
+baseRadius = "0.8rem"
+buttonRadius = "0.75rem"
+redColor = "#d33a3a"
+greenColor = "#2f9e5f"
+violetColor = "#7e3bb0"
+headingFontWeights = [800, 750, 700, 650, 600, 600]
+
+[theme.sidebar]
+backgroundColor = "#e4f2e8"
+secondaryBackgroundColor = "#d4eadb"
+borderColor = "#c3dfcc"
 
 [client]
 toolbarMode = "minimal"

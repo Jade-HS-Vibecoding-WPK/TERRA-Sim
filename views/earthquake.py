@@ -10,6 +10,7 @@ from modules.viewer_webgpu import scene as vscene
 from views.common import (RADIO_OPTIONS, damage_colors, damage_legend, damage_tooltips, no_buildings,
                           num, page_header, scene_for, show_scene)
 from views.common import current_quake
+from views.common import card, kpi_row, odds_card, official_quake_zone
 
 PRESETS = {
     "Spürbar · Mw 4,5 in 20 km": (4.5, 20),
@@ -43,13 +44,13 @@ def render():
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:
-        with st.container(border=True):
+        with card():
             st.markdown("**Szenario**")
             for label, (mw, dist) in PRESETS.items():
                 st.button(label, key=f"quake_{label}", width="stretch", on_click=_apply, args=(mw, dist))
             st.caption("In Deutschland sind Beben bis etwa Mw 6 möglich – am ehesten am Niederrhein, "
                        "in der Schwäbischen Alb, im Oberrheingraben und im Vogtland.")
-        with st.container(border=True):
+        with card():
             st.slider("Magnitude (Mw)", 3.0, 8.0, step=0.1, format="%.1f", key="quake_mw")
             st.slider("Entfernung zum Epizentrum", 1, 150, format="%d km", key="quake_dist_km")
             st.radio("Untergrund", RADIO_OPTIONS["quake_soil"], key="quake_soil",
@@ -59,9 +60,14 @@ def render():
         st.caption(f"Intensität am Standort **{intensity_label(k['intensity'])}** "
                    f"(im Epizentrum {intensity_label(k['epicentral_intensity'])}), "
                    f"Bodenbeschleunigung ca. {num(k['pga_g'], 2)} g.")
+        zone = official_quake_zone(model)
+        odds_card(model, "quake", (f"{zone['place']} liegt " + (f"in Erdbebenzone {zone['zone']}"
+                                   + (f" (Untergrundklasse {zone['subsoil']})" if zone.get("subsoil") else "")
+                                   if zone["zone"] is not None else "in keiner Erdbebenzone")
+                                   + ". Chance, dass mindestens diese Intensität erreicht wird.") if zone else "")
 
     with right:
-        c = st.columns(4)
+        c = kpi_row(4)
         c[0].metric(f"Beschädigt (von {k['buildings_total']})", num(k["damaged"]),
                     help="Schadensgrad 1 oder mehr")
         c[1].metric("Schwer beschädigt", num(k["heavy"]), help="Schadensgrad 3 oder mehr: Risse in tragenden Wänden")

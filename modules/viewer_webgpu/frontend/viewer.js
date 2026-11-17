@@ -297,13 +297,13 @@ async function buildTerrain(t) {
   const wallGeo = new THREE.BufferGeometry();
   wallGeo.setAttribute('position', new THREE.Float32BufferAttribute(wall, 3));
   wallGeo.computeVertexNormals();
-  const plinth = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: 0xd9d1c3, roughness: 1 }));
+  const plinth = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: 0xcfdccf, roughness: 1 }));
   plinth.castShadow = true;
   state.plinthMesh = plinth;
 
   // "Tisch", auf dem das Modell steht – fängt den Schatten des Sockels auf
   const table = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
-                               new THREE.MeshStandardMaterial({ color: 0xe4e8e5, roughness: 1 }));
+                               new THREE.MeshStandardMaterial({ color: 0xe3efe6, roughness: 1 }));
   table.rotation.x = -Math.PI / 2;
   table.scale.set(state.radius * 14, state.radius * 14, 1);
   table.position.y = bottom - 0.05;
@@ -614,6 +614,8 @@ async function buildDynamic(s) {
     });
   }
 
+  if (s.windrose) dynamic.add(makeWindRose(s.windrose, box, bottom));
+
   state.movers = [];
   for (const [kind, spec, make] of [['funnel', s.funnel, makeFunnel], ['monster', s.monster, makeMonster]]) {
     if (!spec) continue;
@@ -646,6 +648,41 @@ async function buildDynamic(s) {
     shaft.castShadow = head.castShadow = true;
     dynamic.add(shaft, head);
   }
+}
+
+// Windrose aus Messdaten als Kranz um den Sockel: je Richtung, aus der der Wind
+// kommt, ein Balken nach außen – Länge = Häufigkeit, gestapelt nach Windstärke.
+function makeWindRose(rose, box, bottom) {
+  const group = new THREE.Group();
+  const cx = (box.max.x + box.min.x) / 2, cz = (box.max.z + box.min.z) / 2;
+  const r0 = 0.5 * Math.hypot(box.max.x - box.min.x, box.max.z - box.min.z) * 1.04;
+  const totals = rose.shares.map((row) => row.reduce((a, b) => a + b, 0));
+  const scale = (state.radius * 0.45) / Math.max(1e-6, Math.max(...totals));   // längster Balken = 45 % des Radius
+  const sector = 360 / rose.angles.length;
+  const mats = rose.colors.map(([r, g, b]) => new THREE.MeshStandardMaterial({
+    color: srgb(r, g, b), roughness: 0.85, side: THREE.DoubleSide }));
+  rose.angles.forEach((deg, k) => {
+    let inner = r0;
+    const theta = THREE.MathUtils.degToRad(90 - deg - sector * 0.42);   // Kompass -> Kreiswinkel der Ebene
+    rose.shares[k].forEach((share, c) => {
+      const len = share * scale;
+      if (len < 0.2) return;
+      const ring = new THREE.Mesh(new THREE.RingGeometry(inner, inner + len, 1, 1, theta,
+                                                         THREE.MathUtils.degToRad(sector * 0.84)), mats[c]);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(cx, bottom + 0.4 + c * 0.05, cz);
+      ring.receiveShadow = true;
+      group.add(ring);
+      inner += len;
+    });
+  });
+  // Kreis um den Sockel als Bezug
+  const base = new THREE.Mesh(new THREE.RingGeometry(r0 - 1.5, r0, 96),
+    new THREE.MeshStandardMaterial({ color: 0x9fd6b3, roughness: 1, side: THREE.DoubleSide }));
+  base.rotation.x = -Math.PI / 2;
+  base.position.set(cx, bottom + 0.35, cz);
+  group.add(base);
+  return group;
 }
 
 // Tornado: trichterförmiger Wirbel aus Wolkenbändern, unten eine Trümmerwolke
@@ -882,7 +919,7 @@ function setHover(i) {
   }
   if (i >= 0) {
     c.setRGB(state.baseColors[i * 3], state.baseColors[i * 3 + 1], state.baseColors[i * 3 + 2]);
-    paintBuilding(i, c.lerp(srgb(11, 110, 116), 0.35));
+    paintBuilding(i, c.lerp(srgb(31, 122, 77), 0.4));
   }
   state.hover = i;
   attr.needsUpdate = true;

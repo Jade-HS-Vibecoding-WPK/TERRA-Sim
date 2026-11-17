@@ -9,6 +9,7 @@ from modules.map_selector import (bbox_center, bbox_from_center, bbox_size_m, cl
                                   geocode_address, render_map_selector)
 from views.common import (build_model, cached_climate, cached_dem, cached_osm, get_model,
                           num, read_project_file)
+from views.common import card, kpi_row, page_header, warm_official_data
 from modules.dgm1_loader import candidates as dgm1_candidates
 from modules.terrain_loader import flat_dem
 
@@ -107,6 +108,9 @@ def create_project(name: str, bbox: tuple, settings: dict | None = None):
             notes.append(f"Klimadaten fehlen: {climate_error} Die Analysen nutzen dann Standardwerte.")
         st.write("🧱 Raster und 3D-Modell …")
         model = build_model(name, bbox, osm, dem, climate, climate_error)
+        st.write("🏛️ Amtliche Daten zur Häufigkeit: Starkregen (DWD), Hochwasserkarten (BfG), "
+                 "Sturmmessungen (DWD), Erdbebenzone (GFZ) …")
+        warm_official_data(model)
         status.update(label="Projekt angelegt", state="complete", expanded=False)
 
     ss = st.session_state
@@ -135,7 +139,8 @@ def render():
     ss = st.session_state
     model = get_model()
 
-    st.title("Neues Projekt")
+    page_header("Neues Projekt", "Erst das Gebiet festlegen – dann lädt TERRA-Sim Gebäude, Gelände und Klima, und "
+                                 "3D-Modell und Analysen werden freigeschaltet.")
     st.html(_steps(1))
     if model is not None:
         st.info(f"Das Projekt **{model.name}** ist geöffnet. Ein neues Projekt ersetzt es.")
@@ -144,7 +149,7 @@ def render():
     left, right = st.columns([1, 2.1], gap="large")
 
     with left:
-        with st.container(border=True):
+        with card():
             st.subheader("1 · Standort festlegen")
             tab_address, tab_coords, tab_preset, tab_file = st.tabs(
                 ["Adresse", "Koordinaten", "Beispielort", "Projektdatei"])
@@ -196,7 +201,7 @@ def render():
             lat_c, lon_c = bbox_center(ss.draft_bbox)
             st.caption(f"Gebiet: {num(width)} × {num(height)} m · Mitte {lat_c:.5f}° N, {lon_c:.5f}° E")
 
-        with st.container(border=True):
+        with card():
             st.subheader("2 · Projekt anlegen")
             name = st.text_input("Projektname", key="project_name",
                                  placeholder=ss.get("place_label") or "Projekt")

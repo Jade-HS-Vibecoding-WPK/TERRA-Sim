@@ -11,8 +11,46 @@ from modules.simulator import flood_curve
 from modules.viewer_webgpu import scene as vscene
 from views.common import (GREY, RED, building_tooltips, current_flood, flood_references,
                           legend_swatches, no_buildings, num, page_header, scene_for, show_scene)
+from views.common import card, kpi_row, legend_ramp, odds_card, official_flood_impact
 
 WATER = (38, 120, 220)
+OFFICIAL_LEVEL = {"L": 0.35, "M": 0.65, "H": 1.0}   # Heatmap-Wert je amtlichem Szenario
+
+
+def _official_card(model, impact):
+    """Amtliche Hochwassergefahrenkarte: Szenarien, Wiederkehrzeit, betroffene Gebäude."""
+    from modules.likelihood import LIFETIME_YEARS, describe, percent
+    odds_card(model, "flood", "Chance, dass Gebäude im Gebiet bei einem Flusshochwasser nass werden – "
+                              "nach den amtlichen Gefahrenkarten, unabhängig vom Pegel oben.")
+    with card("mint"):
+        st.markdown("**Amtliche Hochwassergefahrenkarte**")
+        st.toggle("Überflutungsflächen im 3D-Modell zeigen", key="flood_official")
+        if impact is None:
+            st.caption("Der Kartendienst der Bundesanstalt für Gewässerkunde ist gerade nicht erreichbar.")
+            return
+        if not impact:
+            st.caption("Das Gebiet liegt außerhalb aller amtlichen Überflutungsflächen von Flüssen "
+                       "(Sturzfluten durch Starkregen sind darin nicht enthalten).")
+            return
+        lines = []
+        for key in ("H", "M", "L"):
+            if key in impact:
+                v = impact[key]
+                d = describe(v["T"])
+                lines.append(f"- **{v['name']}** (etwa alle {v['T']} Jahre, {percent(d['p_life'])} in "
+                             f"{LIFETIME_YEARS} J.): {num(v['share'] * 100)} % der Fläche, **{v['buildings']} Gebäude**")
+        st.markdown("\n".join(lines))
+        st.caption("Quelle: Hochwassergefahrenkarten der Länder nach EU-Hochwasserrisikomanagement-Richtlinie, "
+                   "BfG-Geoportal. Die Flächen enthalten auch das Flussbett.")
+
+
+def _official_overlay(model, impact):
+    if not impact:
+        return None
+    from modules.simulator import _rasterize
+    r = model.raster
+    layers = [([impact[k]["geometry_model"]], [int(OFFICIAL_LEVEL[k] * 100)]) for k in ("L", "M", "H") if k in impact]
+    return _rasterize(layers, r.x0, r.y0, r.cell, r.nx, r.ny) / 100.0
 
 
 def render():
@@ -27,7 +65,7 @@ def render():
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:
-        with st.container(border=True):
+        with card():
             st.markdown("**Szenario**")
             st.slider("Wasserpegel über Bezugsniveau", 0.0, 10.0, step=0.1, format="+%.1f m", key="flood_gauge")
             st.selectbox("Bezugsniveau", list(refs), key="flood_ref")
@@ -37,9 +75,11 @@ def render():
         st.caption(f"Wasserspiegel: {num(level, 1)} m ü. NHN (Bezugsniveau {num(base, 1)} m).")
         if model.dem.source == "flach":
             st.warning("Ohne Geländehöhen ist das Ergebnis nicht aussagekräftig.")
+        impact = official_flood_impact(model)
+        _official_card(model, impact)
 
     with right:
-        c = st.columns(4)
+        c = kpi_row(4)
         c[0].metric(f"Gebäude (von {k['buildings_total']})", num(k["buildings_affected"]),
                     help="Gebäude, die im Wasser stehen")
         c[1].metric("BGF im EG", f"{num(k['flooded_gfa_m2'])} m²",
@@ -51,10 +91,14 @@ def render():
         extra = [f"<b style='color:#ff8a80'>Wassertiefe am Gebäude: {d:.1f} m</b>" if hit else ""
                  for d, hit in zip(result.building_depth, result.affected)]
         water = vscene.water(level - model.zmin) if level > model.zmin else None
-        show_scene(scene_for(model, colors=colors, tips=building_tooltips(model, extra), water=water),
+        overlay = _official_overlay(model, impact) if st.session_state.flood_official else None
+        show_scene(scene_for(model, colors=colors, tips=building_tooltips(model, extra), water=water,
+                             overlay=overlay, ramp="water"),
                    key="scene_flood", height=640)
         st.html(legend_swatches([("Gebäude steht im Wasser", RED), ("Gebäude trocken", GREY),
                                  ("Wasserspiegel", WATER)]))
+        if overlay is not None:
+            st.html(legend_ramp("water", "HQ extrem", "HQ häufig", "Amtliche Überflutungsflächen"))
 
     if no_buildings(model):
         return

@@ -28,7 +28,9 @@ Angelehnt an Planungswerkzeuge wie Autodesk Forma beginnt jede Sitzung mit einem
 2. **Daten laden** – Gebäude, Straßen, Grün- und Wasserflächen (OpenStreetMap), Gelände (Höhenmodell) und Klimadaten der nächsten Wetterstation (Meteostat).
 3. **Analysieren** – erst jetzt werden Übersicht, Klima, 3D-Modell und die drei Analysen in der Seitenleiste freigeschaltet.
 
-Die **Übersicht** zeigt Gebietskennzahlen (GRZ, GFZ, Versiegelung, Grünanteil), den Klima-Steckbrief und je Analyse eine Kachel mit Ampel. Projekt, Kennzahlen (CSV) und alle Gebäude mit ihren Ergebnissen (GeoJSON, z. B. für QGIS) lassen sich exportieren.
+Die **Übersicht** ist ein Bento-Grid: Projektkarte, Klima-Steckbrief, Gebietskennzahlen (GRZ, GFZ, Versiegelung, Grünanteil), je Gefahr eine Kachel mit Ampel und der Frage „Wie oft?“, eine Rangliste „Wie wahrscheinlich ist was?“ und die Exporte (Projektdatei, Kennzahlen als CSV, alle Gebäude mit Ergebnissen als GeoJSON, z. B. für QGIS).
+
+**Design:** überwiegend Grüntöne; **Lila** steht für Warnungen, **Rot** für Gefahr, Schäden und Fehler – in Kacheln, Ampeln, Farbskalen und in der 3D-Ansicht. Wasser bleibt blau.
 
 ### 0. 🌦️ Klima am Standort (Meteostat)
 * Messdaten der nächstgelegenen Wetterstationen der letzten 10 Jahre (Wind: 3 Jahre stündlich).
@@ -57,6 +59,7 @@ Die **Übersicht** zeigt Gebietskennzahlen (GRZ, GFZ, Versiegelung, Grünanteil)
 * Geometrische Expositions- und Sichtlinienanalyse (Raycasting light) statt rechenintensiver CFD-Strömungsmechanik.
 * **Live-Auswertung:** Markierung ungeschützter, hochbelasteter Fassadenflächen sowie enger Straßenschluchten mit Düseneffekt (Venturi-Effekt).
 * **Luftströmung am Boden:** Strömungsfeld in 2 m Höhe aus Potentialströmung um die Gebäude (Beschleunigung an Ecken und in Lücken) und Windschatten hinter den Gebäuden. Als Heatmap „Wind in Fußgängerhöhe“ oder „Windschatten“, mit Kennzahlen (gefährlich windige Flächen ab 54 km/h, Anteil im Windschatten) und als **animierte Windteilchen**, die durch die Straßen und über die Dächer fließen. Der blaue Windpfeil lässt sich ausschalten.
+* **Woher der Wind wirklich kommt:** Aus zehn Jahren Stundenwerten der nächsten DWD-Station zeigt die Seite, wie oft der Wind aus der gewählten Richtung kommt und wie viele Stunden im Jahr er die gewählte Stärke erreicht. In der 3D-Ansicht liegt die gemessene **Windrose als Kranz um den Sockel**: je Richtung ein Balken, Länge = Häufigkeit, Farbe = Windstärke (grün ruhig, lila stark, rot Sturm).
 
 ### 5. 🫨 Modul D: Erdbeben
 * Magnitude, Entfernung zum Epizentrum und Untergrund wählen; Vorlagen von „spürbar“ bis „extrem“ (u. a. wie Roermond 1992).
@@ -76,6 +79,20 @@ Die **Übersicht** zeigt Gebietskennzahlen (GRZ, GFZ, Versiegelung, Grünanteil)
 ### 8. 🛸 Modul G: Alien-Invasion (Planspiel)
 * 1–5 UFOs kreuzen über dem Gebiet, bleiben stehen und holen Menschen mit dem Traktorstrahl hoch; die 3D-Ansicht zählt die Entführungen live mit.
 * Ab 60 m Durchmesser wird ein UFO zum **Mutterschiff**: Es fliegt feste Haltepunkte an und saugt dort alle Gebäude ein, deren Mitte im Strahl liegt – sie schweben drehend nach oben und verschwinden im Schiff. Nach jeder Runde stehen sie wieder da; die Zahl der eingesaugten Gebäude steht in Seite und Übersicht.
+
+### Wie wahrscheinlich ist ein Szenario? (amtliche Daten)
+Zu jeder Gefahr nennt TERRA-Sim, wie oft das eingestellte Szenario am Standort vorkommt – als **Wiederkehrzeit** („etwa alle 100 Jahre“) und als **Chance in 30 Jahren** (z. B. Nutzungsdauer eines Gebäudes). Die Übersicht sortiert alle Gefahren in der Karte „Wie wahrscheinlich ist was?“; Rot = häufig (bis alle 30 Jahre), Lila = bis alle 300 Jahre, Grün = seltener.
+
+| Gefahr | Amtliche Grundlage | So wird gerechnet |
+| :--- | :--- | :--- |
+| Starkregen | **DWD KOSTRA-DWD-2020** – Regenhöhe je Dauerstufe und Wiederkehrzeit (1–100 Jahre, 5-km-Raster) | Regenmenge des Szenarios in der gewählten Dauer (1 h, 6 h, 24 h) in der KOSTRA-Tabelle nachschlagen; neue Szenarien „Amtlicher 100-jährlicher Stunden-/Tagesregen“ |
+| Hochwasser | **Hochwassergefahrenkarten der Länder** (EU-Hochwasserrisikomanagement-Richtlinie, BfG-Geoportal): HQ häufig, HQ100, HQ extrem | Gebäude in den amtlichen Überflutungsflächen zählen; die Flächen lassen sich im 3D-Modell einblenden |
+| Sturm | **DWD-Klimastationen**: tägliche Spitzenböe, Jahreshöchstwerte über Jahrzehnte; **DWD-Stundenwerte** (10 Jahre) für die Windrichtung | Gumbel-Verteilung der Jahreshöchstböen; geteilt durch den Anteil der Sturmstunden aus der gewählten Richtung |
+| Erdbeben | **Erdbebenzonen nach DIN 4149 / DIN EN 1998-1/NA** (Abfrage beim GFZ Potsdam) | Zone = Intensität, die alle 475 Jahre erreicht wird; andere Intensitäten über eine für Mitteleuropa typische Gefährdungskurve |
+| Tornado | **DWD/ESWD-Tornadostatistik 2000–2024** (Beyer, Wapler & Kühne 2025) | Tornados pro Jahr je Stärke × überstrichene Fläche, verteilt auf Deutschland |
+| Kaiju, Aliens | – | Science-Fiction, keine Daten 🙂 |
+
+Alle Daten werden beim Anlegen des Projekts geladen und in `.cache/gov/` zwischengespeichert. Fällt ein Dienst aus, läuft die App ohne diese Angabe weiter.
 
 ### Animation: Menschen im Gebiet
 * Bis zu 1.000 kleine Figuren (Anzahl in der Seitenleiste, 0 = aus) laufen auf Straßen und Wegen und reagieren auf die gewählte Gefahr: Beim Orkan werden sie weggeweht – je nach Wind an ihrer Stelle, im Windschatten bleiben sie stehen, an Ecken fliegen sie –, der Tornado saugt sie hoch, vor dem Monster fliehen sie, Explosionen schleudern sie weg, UFOs holen sie ab, beim Erdbeben stürzen sie, im Hochwasser schwimmen sie.
@@ -115,7 +132,9 @@ terra-sim/
 │   ├── climate_loader.py      # Lädt Klimadaten (Meteostat): Steckbrief, Windrose
 │   ├── mesh_builder.py        # Baut das 3D-Modell & exportiert DXF/OBJ/STL
 │   ├── simulator.py           # Berechnet Hochwasser-, Regen- und Wind-Effekte
-│   ├── hazards.py             # Erdbeben, Tornado, Kaiju (Schadensgrad 0–5 je Gebäude)
+│   ├── hazards.py             # Erdbeben, Tornado, Kaiju, Aliens (Schadensgrad 0–5 je Gebäude)
+│   ├── gov_data.py            # Amtliche Daten: KOSTRA, Hochwasserkarten, DWD-Wind/Böen, Erdbebenzonen
+│   ├── likelihood.py          # Wiederkehrzeiten & Wahrscheinlichkeiten (Gumbel, KOSTRA, Zonen, Tornado)
 │   ├── viewer_webgpu/         # 3D-Ansicht der App: three.js mit WebGPU (Streamlit-Komponente)
 │   │   ├── scene.py           #   baut die Szene (Gelände, Gebäude, Analyse-Ebenen) – nur numpy
 │   │   └── frontend/          #   viewer.js rendert, people.js = Menschen, flow.js = Wind- und Tornado-Teilchen,
@@ -223,6 +242,18 @@ TERRA-Sim liefert **Ersteinschätzungen für den Entwurf**, keine Gutachten.
 * **Starkwind:** geometrische Sichtlinien-Analyse für die Fassaden. Die Strömung
   am Boden ist eine Potentialströmung mit vereinfachtem Windschatten – keine
   CFD: keine Wirbel, keine Ablösung, keine Strömung über die Dächer hinweg.
+* **Wahrscheinlichkeiten:** Wiederkehrzeiten über etwa 100 Jahre sind aus
+  25–70 Jahren Messung nur grob abschätzbar (Gumbel-Hochrechnung, KOSTRA-
+  Fortschreibung über 100 Jahre). Die Erdbebenzonen gelten für die Ortsmitte der
+  Gemeinde; die neue Gefährdungskarte (DIN EN 1998-1/NA:2021) ist nicht als offener
+  Datensatz verfügbar. Die Tornado-Angabe ist ein bundesweiter Mittelwert
+  (regional bis etwa Faktor 2 höher, z. B. Niederrhein, Nordseeküste).
+  Hochwasser umfasst nur Flüsse – Sturzfluten durch Starkregen stehen nicht in
+  den Gefahrenkarten.
+* **Quellen und Lizenzen:** DWD-Daten (KOSTRA, Stationsmessungen) unter CC BY 4.0,
+  „Datenbasis: Deutscher Wetterdienst“. Hochwassergefahrenkarten: Daten der Länder
+  über das BfG-Geoportal – die Lizenz ist dort nicht angegeben, vor einer
+  Veröffentlichung bitte prüfen. Erdbebenzonen: GFZ Potsdam.
 * **3D-Ansicht:** Die Bibliothek three.js wird beim Öffnen aus dem Internet geladen
   (jsDelivr). Ohne Internet bleibt die 3D-Ansicht leer – die App braucht für
   OpenStreetMap ohnehin eine Verbindung.

@@ -158,7 +158,7 @@ def load_climate(lat: float, lon: float, years: int = 10, wind_years: int = 3,
             break
 
     daily = daily.apply(pd.to_numeric, errors="coerce").astype(float) if not daily.empty else daily
-    attribution = "Meteostat" + "".join(f", {name}" for name in sorted(licenses) if name)
+    attribution = "Meteostat" + "".join(f", {name}" for name in sorted(n for n in licenses if n))
     return ClimateData(lat, lon, start, end, daily, hourly, sources, attribution)
 
 
@@ -263,3 +263,31 @@ def annual_extremes(daily: pd.DataFrame) -> pd.DataFrame:
     table = daily[present].groupby(daily.index.year).max().rename(columns=columns)
     table.index.name = "Jahr"
     return table.reset_index()
+
+
+def direction_stats(hourly: pd.DataFrame, direction_deg: float, beaufort: int) -> dict:
+    """Wie oft kommt der Wind aus dieser Richtung – und wie oft so stark?
+
+    ``direction_deg``  Richtung, aus der der Wind kommt (Sektor ± 11,25°)
+    ``beaufort``       Mindeststärke (Stundenmittel in 10 m Höhe)
+    Rückgabe: Anteile in % und Stunden pro Jahr (Mittel über den Messzeitraum).
+    """
+    h = hourly.dropna(subset=["wdir", "wspd"]) if not hourly.empty else hourly
+    if h.empty:
+        return {}
+    years = max(1e-6, (h.index[-1] - h.index[0]).days / 365.25)
+    sector = ((h["wdir"].to_numpy() + 11.25) // 22.5).astype(int) % 16
+    chosen = int(round(direction_deg / 22.5)) % 16
+    moving = h["wspd"].to_numpy() >= 1
+    from_dir = (sector == chosen) & moving
+    threshold = BEAUFORT_KMH[max(0, int(beaufort) - 1)] if beaufort > 0 else 0
+    strong = h["wspd"].to_numpy() >= threshold
+    return {
+        "years": years,
+        "sector": COMPASS_16[chosen],
+        "share_from_dir": 100.0 * from_dir.sum() / max(1, moving.sum()),
+        "strong_hours_per_year": float(strong.sum() / years),
+        "strong_from_dir_hours_per_year": float((strong & from_dir).sum() / years),
+        "share_strong_from_dir": 100.0 * (strong & from_dir).sum() / max(1, strong.sum()),
+        "max_kmh": float(h["wspd"].max()),
+    }

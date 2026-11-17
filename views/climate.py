@@ -9,8 +9,9 @@ import streamlit as st
 from modules.climate_loader import (BEAUFORT_KMH, annual_extremes, kmh_to_beaufort,
                                     monthly_climate, wind_rose)
 from views.common import climate_info, num, page_header, rain_scenarios, wind_direction_label
+from views.common import card, kpi_row
 
-ROSE_COLORS = ["#c7e9e5", "#7fc8bf", "#2c9a93", "#0b4f54"]
+ROSE_COLORS = ["#c8eacf", "#4fae78", "#8e4cc4", "#d33a3a"]   # ruhig = grün, stark = lila, Sturm = rot
 
 PARAMETER_NAMES = {"temp": "Temperatur", "tmin": "Tiefsttemperatur", "tmax": "Höchsttemperatur",
                    "prcp": "Niederschlag", "wspd": "Wind (Tagesmittel)", "wpgt": "Böen",
@@ -45,7 +46,7 @@ def render():
         return
     climate = model.climate
 
-    cols = st.columns(6)
+    cols = kpi_row(6)
     cols[0].metric("Jahresmittel", f"{num(info['temp_mean'], 1)} °C" if info["temp_mean"] is not None else "–")
     cols[1].metric("Heiße Tage", f"{num(info['hot_days'], 1)} / Jahr" if info["hot_days"] is not None else "–",
                    help="Tage mit mindestens 30 °C")
@@ -96,7 +97,7 @@ def render():
                        f"bei starkem Wind: {wind_direction_label(info['wind_dir_strong'])}.")
 
     st.subheader("Szenarien für die Analysen")
-    with st.container(border=True):
+    with card():
         c1, c2 = st.columns(2)
         with c1:
             if info.get("wind_max_hour"):

@@ -28,10 +28,12 @@ from modules.terrain_loader import DemGrid, flat_dem, load_dem
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 PROJECT_FILE_VERSION = 1
 
-GREY = (214, 210, 204)
-RED = (214, 48, 49)
-ORANGE = (240, 140, 40)
-SOURCE_COLORS = {"OSM-Höhe": (49, 163, 84), "OSM-Geschosse": (116, 169, 207), "Schätzung": (240, 180, 90)}
+# Farben: Grün = Normalzustand, Lila = Warnung, Rot = Gefahr/Schaden (wie assets/style.css)
+GREY = (222, 226, 218)          # unbeschädigte Gebäude (leicht grünliches Hellgrau)
+RED = (211, 58, 58)             # Gebäude im Wasser, Gefahr
+PURPLE = (126, 59, 176)         # Warnung, z. B. Rückstau-Risiko beim Starkregen
+ORANGE = PURPLE                 # (alter Name, für Kompatibilität)
+SOURCE_COLORS = {"OSM-Höhe": (47, 158, 95), "OSM-Geschosse": (159, 214, 179), "Schätzung": (176, 120, 214)}
 
 STANDARD_RAIN = {
     "Starkregen (30 l/m²)": 30,
@@ -51,6 +53,8 @@ SETTINGS_DEFAULTS = {
     "model_lod": "LOD 1 – Klötzchenmodell",
     "model_color": "Einheitlich",
     "rain_sewer": 20,
+    "rain_duration": "24 Stunden",
+    "flood_official": True,
     "quake_mw": 5.5,
     "quake_dist_km": 15,
     "quake_soil": "Mittel (Kies, fester Lehm)",
@@ -66,6 +70,7 @@ SETTINGS_DEFAULTS = {
     "wind_ground": "Wind in Fußgängerhöhe",
     "wind_flow": True,
     "wind_arrow": True,
+    "wind_rose": True,
     "alien_ufos": 2,
     "alien_size": 30,
     "alien_height": 60,
@@ -83,6 +88,7 @@ RADIO_OPTIONS = {
     "wind_ground": ["Wind in Fußgängerhöhe", "Windschatten", "keine"],
     "quake_soil": ["Fels", "Mittel (Kies, fester Lehm)", "Weich (Sand, Ton, Auen)"],
     "rain_display": ["Risiko-Index", "Wassertiefe in Senken", "Abflussbahnen"],
+    "rain_duration": ["1 Stunde", "6 Stunden", "24 Stunden"],
     "model_lod": ["LOD 1 – Klötzchenmodell", "LOD 2 – mit Dachformen"],
     "model_color": ["Einheitlich", "Gebäudehöhe", "Datenquelle der Höhe"],
 }
@@ -225,8 +231,16 @@ def flood_references(model: Model) -> dict:
 
 
 def rain_scenarios(model: Model) -> dict:
-    """Standard-Szenarien plus der stärkste gemessene Tagesregen am Standort."""
+    """Standard-Szenarien, der stärkste gemessene Tagesregen am Standort und die amtlichen
+    100-jährlichen Regen aus KOSTRA-DWD-2020 (Stunden- und Tagesregen)."""
     scenarios = dict(STANDARD_RAIN)
+    table = official_kostra(model)
+    if table.get(1440, {}).get(100):
+        scenarios = {f"Amtlicher 100-jährlicher Tagesregen (KOSTRA, {num(table[1440][100])} l/m²)":
+                     round(table[1440][100], 1), **scenarios}
+    if table.get(60, {}).get(100):
+        scenarios = {f"Amtlicher 100-jährlicher Stundenregen (KOSTRA, {num(table[60][100])} l/m²)":
+                     round(table[60][100], 1), **scenarios}
     info = climate_info(model)
     if info and info.get("prcp_max_day"):
         label = (f"Stärkster Tagesregen am Standort ({num(info['prcp_max_day'])} l/m², "
@@ -323,7 +337,7 @@ def current_kaiju(model: Model):
 
 
 # Schadensgrad 0..5 -> Farbe (0 = Grau wie unbeschädigte Gebäude)
-DAMAGE_COLORS = [GREY, (250, 222, 100), (246, 162, 62), (226, 88, 46), (178, 30, 42), (84, 18, 32)]
+DAMAGE_COLORS = [GREY, (214, 190, 236), (164, 104, 212), (214, 72, 96), (190, 30, 45), (96, 12, 30)]
 
 
 def damage_colors(damage) -> np.ndarray:
@@ -353,6 +367,126 @@ def damage_tooltips(model: Model, damage, prefix: str = "") -> list:
 @st.cache_data(show_spinner="Strömung wird berechnet …", max_entries=32)
 def cached_wind_field(model_key: str, direction: float, beaufort: int, _raster: Raster, _heights):
     return wind_field(_raster, _heights, direction, beaufort)
+
+
+# ==========================================================================
+# Amtliche Daten (modules/gov_data.py) – je Standort einmal laden
+# ==========================================================================
+
+GOV_TTL = 30 * 24 * 3600
+RAIN_DURATION_MIN = {"1 Stunde": 60, "6 Stunden": 360, "24 Stunden": 1440}
+
+
+@st.cache_data(show_spinner="Starkregen-Statistik (DWD KOSTRA) wird geladen …", ttl=GOV_TTL)
+def _kostra(lat: float, lon: float) -> dict:
+    from modules.gov_data import kostra
+    return kostra(lat, lon)
+
+
+@st.cache_data(show_spinner="Amtliche Hochwassergefahrenkarten werden geladen …", ttl=GOV_TTL, max_entries=16)
+def _floods(bbox: tuple) -> dict:
+    from modules.gov_data import official_floods
+    return official_floods(bbox)
+
+
+@st.cache_data(show_spinner="Böen-Messreihe (DWD) wird geladen …", ttl=GOV_TTL)
+def _gusts(lat: float, lon: float) -> dict:
+    from modules.gov_data import gust_maxima
+    return gust_maxima(lat, lon)
+
+
+@st.cache_data(show_spinner="Windmessungen (DWD) werden geladen …", ttl=GOV_TTL)
+def _dwd_wind(lat: float, lon: float) -> dict:
+    from modules.gov_data import hourly_wind
+    return hourly_wind(lat, lon)
+
+
+@st.cache_data(show_spinner="Erdbebenzone (GFZ) wird abgefragt …", ttl=GOV_TTL)
+def _quake_zone(lat: float, lon: float) -> dict:
+    from modules.gov_data import quake_zone
+    return quake_zone(lat, lon)
+
+
+def _site(model: Model) -> tuple[float, float]:
+    lat, lon = model.center
+    return round(lat, 4), round(lon, 4)
+
+
+def _safe(loader, *args):
+    """Amtliche Daten laden; bei Netzwerk- oder Formatfehlern ``None`` statt Absturz."""
+    try:
+        return loader(*args)
+    except Exception as error:   # Dienste sind extern – die App soll trotzdem laufen
+        st.session_state.setdefault("_gov_errors", {})[getattr(loader, "__name__", "amtliche Daten")] = str(error)[:200]
+        return None
+
+
+def official_kostra(model: Model) -> dict:
+    return _safe(_kostra, *_site(model)) or {}
+
+
+def official_gusts(model: Model) -> dict:
+    return _safe(_gusts, *_site(model)) or {}
+
+
+def official_quake_zone(model: Model):
+    return _safe(_quake_zone, *_site(model))
+
+
+def measured_wind(model: Model) -> tuple:
+    """Stündlicher Wind am Standort: bevorzugt 10 Jahre DWD, sonst Meteostat. -> (Tabelle, Quelle)."""
+    dwd = _safe(_dwd_wind, *_site(model))
+    if dwd:
+        return dwd["hourly"], f"DWD-Station {dwd['station']} ({num(dwd['km'])} km)"
+    if model.climate_ok and not model.climate.hourly.empty:
+        return model.climate.hourly, model.climate.attribution
+    return None, ""
+
+
+
+def warm_official_data(model: Model):
+    """Alle amtlichen Daten für das Projekt vorab laden (Fehler werden still übergangen)."""
+    official_kostra(model)
+    official_gusts(model)
+    official_quake_zone(model)
+    measured_wind(model)
+    official_flood_impact(model)
+
+@st.cache_data(show_spinner=False, max_entries=8)
+def _flood_impact(model_key: str, _model: Model, _floods: dict) -> dict:
+    from pyproj import Transformer
+    from shapely.ops import transform
+    project = Transformer.from_crs("EPSG:25832", _model.crs, always_xy=True).transform
+    geoms = np.asarray(_model.buildings.geometry.values)
+    out = {}
+    for key, scenario in _floods.items():
+        area = transform(project, scenario["geometry"])
+        hit = shapely.intersects(geoms, area) if len(geoms) else np.zeros(0, bool)
+        out[key] = {**{k: v for k, v in scenario.items() if k != "geometry"}, "geometry_model": area,
+                    "buildings": int(hit.sum()), "hit": hit}
+    return out
+
+
+def official_flood_impact(model: Model):
+    """Amtliche Überflutungsflächen im Gebiet und betroffene Gebäude je Szenario (None bei Fehler)."""
+    floods = _safe(_floods, tuple(round(v, 5) for v in model.bbox))
+    if floods is None:
+        return None
+    return _flood_impact(model.key, model, floods)
+
+
+@st.cache_data(show_spinner=False, max_entries=64)
+def _direction_stats(model_key: str, direction: int, beaufort: int, _hourly):
+    from modules.climate_loader import direction_stats
+    return direction_stats(_hourly, direction, beaufort)
+
+
+def measured_direction_stats(model: Model, direction: int, beaufort: int) -> dict:
+    """Gemessene Häufigkeit von Windrichtung und -stärke am Standort (leer ohne Daten)."""
+    hourly, source = measured_wind(model)
+    if hourly is None:
+        return {}
+    return {**_direction_stats(f"{model.key}_{source}", int(direction), int(beaufort), hourly), "source": source}
 
 
 def current_wind_field(model: Model):
@@ -424,7 +558,10 @@ def _clean_settings(raw: dict) -> dict:
 # ==========================================================================
 
 def load_style():
-    st.html(f"<style>{(ASSETS / 'style.css').read_text(encoding='utf-8')}</style>")
+    # Achtung: st.html verwirft einen <style>-Block komplett, wenn darin "<" vorkommt
+    # (Schutz vor eingeschleustem HTML) – deshalb hier sicherheitshalber entfernen.
+    css = (ASSETS / "style.css").read_text(encoding="utf-8").replace("<", "")
+    st.html(f"<style>{css}</style>")
 
 
 def num(value: float, digits: int = 0) -> str:
@@ -434,15 +571,53 @@ def num(value: float, digits: int = 0) -> str:
 
 
 def page_header(title: str, subtitle: str = ""):
+    """Grüner Kopfbereich jeder Seite (Projekt, Titel, kurze Erklärung)."""
     model = get_model()
+    crumb = ""
     if model is not None:
         lat, lon = model.center
         width, height = bbox_size_m(model.bbox)
-        st.html(f'<div class="terra-crumb">Projekt <b>{html.escape(model.name)}</b> · '
-                f'{lat:.4f}° N, {lon:.4f}° E · {num(width)} × {num(height)} m</div>')
-    st.title(title)
-    if subtitle:
-        st.caption(subtitle)
+        crumb = (f'<div class="crumb">Projekt <b>{html.escape(model.name)}</b> · '
+                 f'{lat:.4f}° N, {lon:.4f}° E · {num(width)} × {num(height)} m</div>')
+    sub = f"<p>{html.escape(subtitle)}</p>" if subtitle else ""
+    st.html(f'<div class="terra-hero">{crumb}<h1>{html.escape(title)}</h1>{sub}</div>')
+
+
+# ---------------------------------------------------------------------------
+# Bento-Karten: Streamlit hängt den Schlüssel als CSS-Klasse an (st-key-…)
+# ---------------------------------------------------------------------------
+
+CARD_TONES = ("plain", "mint", "dark", "warn", "risk")
+
+
+def reset_layout():
+    """Zu Beginn jedes Durchlaufs: Kartennummern neu zählen (stabile Schlüssel)."""
+    st.session_state["_card_n"] = 0
+
+
+def _next_key(prefix: str) -> str:
+    n = st.session_state.get("_card_n", 0) + 1
+    st.session_state["_card_n"] = n
+    return f"{prefix}-{n}"
+
+
+def card(tone: str = "plain", height=None):
+    """Bento-Karte: ``plain`` (weiß), ``mint`` (hellgrün), ``dark`` (dunkelgrün),
+    ``warn`` (lila) oder ``risk`` (rot). Gebrauch: ``with card(): …``"""
+    tone = tone if tone in CARD_TONES else "plain"
+    kwargs = {"height": height} if height else {}
+    return st.container(key=_next_key(f"card-{tone}"), **kwargs)
+
+
+def tone_of(level: str) -> str:
+    """Ampel-Stufe (ok | warn | risk | none) -> Kartenfarbe."""
+    return {"warn": "warn", "risk": "risk"}.get(level, "plain")
+
+
+def kpi_row(spec):
+    """Reihe kleiner Kennzahl-Kacheln; ``spec`` wie bei ``st.columns``."""
+    with st.container(key=_next_key("kpis")):
+        return st.columns(spec)
 
 
 def pill(text: str, level: str) -> str:
@@ -543,3 +718,142 @@ def no_buildings(model: Model) -> bool:
 
 def wind_direction_label(direction: float) -> str:
     return f"{compass_name(direction)} ({int(direction)}°)"
+
+
+# ---------------------------------------------------------------------------
+# Wahrscheinlichkeit eines Szenarios (siehe modules/likelihood.py)
+# ---------------------------------------------------------------------------
+
+ODDS_COLORS = {"risk": "#d33a3a", "warn": "#7e3bb0", "ok": "#2f9e5f", "none": "#9fb5a8"}
+
+
+def odds_bar(label: str, odds: dict, note: str = "") -> str:
+    """Zeile mit Balken: Wahrscheinlichkeit in 30 Jahren (logarithmisch 0,001 % … 100 %)."""
+    from modules.likelihood import LIFETIME_YEARS, percent
+    p = odds.get("p_life")
+    width = 0 if not p else max(2.0, min(100.0, (np.log10(max(p, 1e-5)) + 5) / 5 * 100))
+    color = ODDS_COLORS.get(odds.get("level", "none"), ODDS_COLORS["none"])
+    value = f"{percent(p)} in {LIFETIME_YEARS} J." if p is not None else "keine Angabe"
+    sub = f'<div class="value" style="grid-column:1/-1;font-size:.76rem">{html.escape(note)}</div>' if note else ""
+    return (f'<div class="terra-prob"><span class="label">{html.escape(label)}</span>'
+            f'<span class="value">{html.escape(odds.get("text", ""))} · {value}</span>'
+            f'<div class="bar"><span style="width:{width:.0f}%;background:{color}"></span></div>{sub}</div>')
+
+
+def odds_line(odds: dict, source: str = "") -> str:
+    """Kurzer Satz für Kacheln: „Wie oft? etwa alle 120 Jahre (22 % in 30 Jahren)“."""
+    from modules.likelihood import LIFETIME_YEARS, percent
+    if not odds or odds.get("T") is None:
+        return ""
+    color = ODDS_COLORS.get(odds["level"], ODDS_COLORS["none"])
+    src = f" · {html.escape(source)}" if source else ""
+    return (f'Wie oft? <b style="color:{color}">{html.escape(odds["text"])}</b> '
+            f'({percent(odds["p_life"])} in {LIFETIME_YEARS} Jahren){src}')
+
+
+def scenario_odds(model: Model) -> dict:
+    """Wahrscheinlichkeit der aktuell eingestellten Szenarien: {Gefahr: (odds, Quelle)}.
+
+    Gefahren: flood, rain, wind, quake, tornado, fiction (Planspiele).
+    """
+    from modules.hazards import EF_PATH_WIDTH_M
+    from modules.likelihood import describe, tornado_return_period
+    ss = st.session_state
+    out = {}
+    width, height = bbox_size_m(model.bbox)
+    T = tornado_return_period(int(_setting("tornado_ef")), max(width, height), EF_PATH_WIDTH_M)
+    from modules.likelihood import TORNADO_SOURCE
+    out["tornado"] = (describe(T), TORNADO_SOURCE)
+    out["fiction"] = ({"T": None, "p_year": 0.0, "p_life": None, "text": "Science-Fiction – keine Daten",
+                       "level": "none"}, "")
+    out.update(_official_odds(model))
+    return out
+
+
+def _official_odds(model: Model) -> dict:
+    """Szenarien mit amtlichen Daten (Starkregen, Hochwasser, Sturm, Erdbeben) – siehe gov_data.py."""
+    from modules.likelihood import (describe, gumbel_fit, gumbel_return_period, quake_return_period_from_zone,
+                                    rain_return_period)
+    from modules.simulator import beaufort_to_ms
+    out = {}
+
+    # Starkregen: KOSTRA-Tabelle der gewählten Dauerstufe
+    table = official_kostra(model)
+    scenarios = rain_scenarios(model)
+    label = st.session_state.get("rain_scenario")
+    label = label if label in scenarios else SETTINGS_DEFAULTS["rain_scenario"]
+    minutes = rain_duration_min(label)
+    if table.get(minutes):
+        T = rain_return_period(table[minutes], scenarios[label])
+        out["rain"] = (describe(T), f"DWD KOSTRA-DWD-2020, als {RAIN_DURATION_NAME[minutes]}")
+
+    # Hochwasser: häufigstes amtliches Szenario, das Gebäude erreicht
+    impact = official_flood_impact(model)
+    if impact is not None:
+        hits = sorted((v for v in impact.values() if v["buildings"]), key=lambda v: v["T"])
+        if hits:
+            first = hits[0]
+            out["flood"] = (describe(first["T"]), f"amtliche Gefahrenkarte: {first['buildings']} Gebäude im "
+                                                  f"{first['name']}-Gebiet")
+        else:
+            text = ("kein Gebäude in amtlichen Überflutungsflächen" if impact
+                    else "außerhalb amtlicher Überflutungsflächen")
+            out["flood"] = ({"T": None, "p_year": 0.0, "p_life": None, "text": text, "level": "ok"},
+                            "Hochwassergefahrenkarten der Länder (BfG)")
+
+    # Sturm: Jahreshöchstwerte der Böen (Gumbel) und Anteil der Richtung bei starkem Wind
+    beaufort = int(_setting("wind_bft"))
+    gusts = official_gusts(model)
+    if beaufort > 0 and gusts:
+        gust = beaufort_to_ms(beaufort) * 3.6 * 1.5
+        T_any = gumbel_return_period(gumbel_fit(gusts["maxima"].values), gust)
+        stats = measured_direction_stats(model, int(_setting("wind_dir")), 6)
+        share = stats.get("share_strong_from_dir") if stats else None
+        if T_any and share:
+            out["wind"] = (describe(T_any / (share / 100)),
+                           f"Böen ab {num(gust)} km/h aus {stats['sector']}; aus allen Richtungen "
+                           f"{describe(T_any)['text']} (DWD {gusts['station']}, {gusts['years']})")
+        elif T_any:
+            out["wind"] = (describe(T_any), f"Böen ab {num(gust)} km/h (DWD {gusts['station']}, {gusts['years']})")
+
+    # Erdbeben: Zone am Ort und Intensität des Szenarios
+    zone = official_quake_zone(model)
+    if zone:
+        intensity = current_quake(model).kpis["intensity"]
+        T = quake_return_period_from_zone(zone["zone"], intensity)
+        where = f"Erdbebenzone {zone['zone']}" if zone["zone"] is not None else "keine Erdbebenzone"
+        out["quake"] = (describe(T), f"{where} ({zone['place']}), GFZ / DIN 4149")
+    return out
+
+
+RAIN_DURATION_NAME = {60: "Stundenregen", 360: "6-Stunden-Regen", 1440: "Tagesregen"}
+
+
+def rain_duration_min(label: str) -> int:
+    """Dauerstufe (Minuten) zum Regen-Szenario: amtliche/gemessene Szenarien haben eine feste Dauer."""
+    if "Stundenregen" in label:
+        return 60
+    if "Tagesregen" in label:
+        return 1440
+    return RAIN_DURATION_MIN.get(st.session_state.get("rain_duration"), 1440)
+
+
+def odds_card(model: Model, key: str, explain: str = ""):
+    """Karte „Wie wahrscheinlich?“ für eine Analyseseite (Gefahr ``key``, siehe scenario_odds)."""
+    from modules.likelihood import LIFETIME_YEARS, percent
+    odds, source = scenario_odds(model).get(key, ({}, ""))
+    tone = {"risk": "risk", "warn": "warn"}.get(odds.get("level"), "mint")
+    with card(tone):
+        st.markdown("**Wie wahrscheinlich ist dieses Szenario?**")
+        if not odds or odds.get("T") is None:
+            st.caption(odds.get("text", "Für dieses Szenario liegen keine Daten zur Häufigkeit vor.")
+                       if odds else "Für dieses Szenario liegen keine Daten zur Häufigkeit vor.")
+            return
+        c = st.columns(2)
+        c[0].metric("Wiederkehrzeit", odds["text"].replace("etwa alle ", "~ "),
+                    help="Im Mittel einmal in so vielen Jahren – nicht „genau dann“.")
+        c[1].metric(f"In {LIFETIME_YEARS} Jahren", percent(odds["p_life"]),
+                    help=f"Wahrscheinlichkeit, dass es in den nächsten {LIFETIME_YEARS} Jahren mindestens einmal "
+                         f"passiert (pro Jahr: {percent(odds['p_year'])}).")
+        if explain or source:
+            st.caption(" ".join(t for t in (explain, f"Quelle: {source}." if source else "") if t))

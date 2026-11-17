@@ -9,11 +9,12 @@ die wiederverwendbare Rechenarbeit in ``modules/``.
 import streamlit as st
 
 from views import navigation
-from views.common import ASSETS, SETTINGS_DEFAULTS, load_style
+from views.common import ASSETS, SETTINGS_DEFAULTS, load_style, reset_layout
 
 st.set_page_config(page_title="TERRA-Sim", page_icon=str(ASSETS / "icon.svg"), layout="wide")
 st.logo(str(ASSETS / "logo.svg"), icon_image=str(ASSETS / "icon.svg"), size="large")
 load_style()
+reset_layout()   # Bento-Karten je Durchlauf neu nummerieren
 
 # Einstellungen der Analysen sollen beim Seitenwechsel erhalten bleiben.
 # Streamlit löscht den Zustand von Bedienelementen, die gerade nicht angezeigt

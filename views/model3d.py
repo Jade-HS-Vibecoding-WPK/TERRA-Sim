@@ -10,6 +10,7 @@ from modules import mesh_builder, viewer_3d
 from modules.map_selector import bbox_center
 from views.common import (GREY, RADIO_OPTIONS, SOURCE_COLORS, legend_ramp, legend_swatches, num,
                           page_header, scene_for, show_scene)
+from views.common import card, kpi_row
 
 
 def building_colors(model, mode: str) -> np.ndarray:
@@ -66,14 +67,14 @@ def render():
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:
-        with st.container(border=True):
+        with card():
             st.markdown("**Darstellung**")
             st.radio("Detailgrad", RADIO_OPTIONS["model_lod"], key="model_lod")
             st.radio("Einfärbung", RADIO_OPTIONS["model_color"], key="model_color")
         lod = 2 if st.session_state.model_lod.startswith("LOD 2") else 1
         color_mode = st.session_state.model_color
 
-        with st.container(border=True):
+        with card():
             st.markdown("**Modell**")
             c1, c2 = st.columns(2)
             c1.metric("Gebäude", num(len(b)))
@@ -83,7 +84,7 @@ def render():
             if lod == 2 and with_roof == 0:
                 st.caption("In OpenStreetMap ist hier keine Dachform hinterlegt – LOD 2 sieht aus wie LOD 1.")
 
-        with st.container(border=True):
+        with card():
             st.markdown("**Export für CAD & 3D-Druck**")
             fmt = st.selectbox("Format", ["OBJ", "STL", "DXF"],
                                help="OBJ: Blender, Rhino, SketchUp · STL: 3D-Druck · "
