@@ -97,6 +97,21 @@ Zu jeder Gefahr nennt TERRA-Sim, wie oft das eingestellte Szenario am Standort v
 
 Alle Daten werden beim Anlegen des Projekts geladen und in `.cache/gov/` zwischengespeichert. Fällt ein Dienst aus, läuft die App ohne diese Angabe weiter.
 
+### 📚 Wissenschaftliche Grundlagen
+
+Jede Analyse legt ihren Rechenweg offen: In der App steht auf jeder Analyseseite eine Karte **🔬 Methode & Quellen** mit den Rechenschritten, Formeln, den von TERRA-Sim selbst gesetzten **Annahmen** (⚙️) und den **Grenzen** des Verfahrens. Die Seite **Methoden & Quellen** (Seitenleiste → Wissen) sammelt alle 48 Quellen – Fachliteratur, Normen und Datensätze mit DOI-Links – und bietet sie als **BibTeX** für Hausarbeiten an. Im Code liegen die Rechenwege in `modules/methods.py`, die Quellen in `modules/sources.py`.
+
+| Analyse | Verfahren | Kernquellen |
+| :--- | :--- | :--- |
+| 3D-Modell | Grundrisse aus OSM, Höhe aus Geschossen, LOD-Konzept, DGM1 | Biljecki et al. (2016, 2017); OGC CityGML 3.0 |
+| Hochwasser | Planares „Badewannen“-Verfahren, amtliche Gefahrenkarten | Teng et al. (2017); EU-HWRM-RL 2007/60/EG |
+| Starkregen | Abflussbeiwerte, Kanalkapazität, Priority-Flood, Fließakkumulation, KOSTRA | DIN 1986-100; DWA-A 118; Barnes et al. (2014); O'Callaghan & Mark (1984); LUBW (2016) |
+| Starkwind | Beaufort, Potenzgesetz, Winddruck nach Eurocode, Düseneffekt, Potentialströmung, Gefahrenkriterium | DIN EN 1991-1-4; Hellmann (1915); Davenport (1960); Oke (1988); Blocken et al. (2008); NEN 8100; Lawson & Penwarden (1975) |
+| Erdbeben | Makroseismische Methode (EMS-98), Intensitätsabnahme, Verletzbarkeitsindex, PGA | Grünthal (1998); Lagomarsino & Giovinazzi (2006); Sponheuer (1960); Wald et al. (1999); Cornell (1968) |
+| Tornado | EF/IF-Skala, Rankine-Wirbel, Schneisen, Häufigkeit in Deutschland | WSEC (2006); ESSL (2023); Brooks (2004); Beyer, Wapler & Kühne (2025) |
+| Wahrscheinlichkeiten | Wiederkehrzeit, Gumbel-Verteilung, Überschreitungswahrscheinlichkeit | Gumbel (1958); Coles (2001); KOSTRA-DWD-2020 |
+| Kaiju · Aliens | Quadrat-Würfel-Gesetz, Knochenstatik, „Rule of Three“ · Grabby-Aliens-Modell | Galilei (1638); Hokkanen (1986); Hanley & Lippman-Hand (1983) · Hanson et al. (2021); Snyder-Beattie et al. (2019) |
+
 ### Animation: Menschen im Gebiet
 * Bis zu 1.000 kleine Figuren (Anzahl in der Seitenleiste, 0 = aus) laufen auf Straßen und Wegen und reagieren auf die gewählte Gefahr: Beim Orkan werden sie weggeweht – je nach Wind an ihrer Stelle, im Windschatten bleiben sie stehen, an Ecken fliegen sie –, der Tornado saugt sie hoch, vor dem Monster fliehen sie, Explosionen schleudern sie weg, UFOs holen sie ab, beim Erdbeben stürzen sie, im Hochwasser schwimmen sie.
 * Die Figur mit dem Afro und dem Namensschild ist **Nik**. Der Knopf **Nik folgen** in der 3D-Ansicht zoomt auf ihn und hängt die Kamera an ihn – auch wenn er durch die Luft fliegt.
@@ -138,6 +153,8 @@ terra-sim/
 │   ├── hazards.py             # Erdbeben, Tornado, Kaiju, Aliens (Schadensgrad 0–5 je Gebäude)
 │   ├── gov_data.py            # Amtliche Daten: KOSTRA, Hochwasserkarten, DWD-Wind/Böen, Erdbebenzonen
 │   ├── likelihood.py          # Wiederkehrzeiten & Wahrscheinlichkeiten (Gumbel, KOSTRA, Zonen, Tornado)
+│   ├── methods.py             # Rechenwege je Analyse: Schritte, Formeln, Annahmen, Grenzen
+│   ├── sources.py             # Quellen-Register (Literatur, Normen, Daten) mit BibTeX-Export
 │   ├── viewer_webgpu/         # 3D-Ansicht der App: three.js mit WebGPU (Streamlit-Komponente)
 │   │   ├── scene.py           #   baut die Szene (Gelände, Gebäude, Analyse-Ebenen) – nur numpy
 │   │   └── frontend/          #   viewer.js rendert, people.js = Menschen, flow.js = Wind- und Tornado-Teilchen,
@@ -148,6 +165,7 @@ terra-sim/
 │   ├── navigation.py          # Seitenstruktur, Sperre bis ein Projekt geladen ist
 │   ├── common.py              # Gemeinsames: Projektdaten, Kennzahlen, Legenden
 │   ├── setup.py               # Projekt anlegen (Standort wählen, Daten laden)
+│   ├── literature.py          # Methoden & Quellen (auch ohne Projekt erreichbar)
 │   ├── overview.py            # Übersicht mit Kennzahlen, Analyse-Kacheln, Exporten
 │   ├── climate.py             # Klima am Standort
 │   ├── model3d.py             # 3D-Modell & Export

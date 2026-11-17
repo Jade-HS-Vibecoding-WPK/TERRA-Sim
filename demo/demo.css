@@ -118,6 +118,21 @@ main { max-width: 1200px; margin: 0 auto; }
 .side-title { font-weight: 750; font-size: 1.08rem; margin: 0 0 10px; }
 .side-note { color: var(--muted); font-size: .86rem; margin: 6px 0 0; }
 
+/* Methode & Quellen */
+.method { margin-top: 16px; padding: 0; }
+.method summary { cursor: pointer; padding: 14px 22px; font-weight: 700; list-style: none; }
+.method summary::-webkit-details-marker { display: none; }
+.method summary::before { content: "▸"; display: inline-block; width: 1.1em; color: var(--g-600); }
+.method[open] summary::before { content: "▾"; }
+.method .body { padding: 0 22px 18px; }
+.method h4 { margin: 14px 0 6px; font-size: .95rem; }
+.method ol, .method ul { margin: 0; padding-left: 1.3rem; }
+.method li { margin: .3rem 0; }
+.method .formula { overflow-x: auto; padding: 4px 0 8px; }
+.method .refs a { font-size: .85rem; text-decoration: none; }
+.method code { background: var(--g-100); border-radius: 5px; padding: 0 4px; font-size: .88em; }
+.method .sources li { font-size: .88rem; color: var(--muted); }
+
 /* große Kennzahlen (wie views.common.facts_html) */
 .terra-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: .8rem 1.4rem; margin: .15rem 0 .35rem; }

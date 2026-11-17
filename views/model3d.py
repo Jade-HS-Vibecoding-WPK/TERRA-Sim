@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 import streamlit as st
+
+from views.common import method_card
 from shapely import affinity
 
 from modules import mesh_builder, viewer_3d
@@ -64,6 +66,8 @@ def render():
                                       "oder mit Dachformen, exportierbar für CAD und 3D-Druck.")
     b = model.buildings
     with_roof = int(((b["roof_shape"] != "flat") & (b["roof_height_m"] > 0)).sum()) if len(b) else 0
+
+    method_card("model")
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:

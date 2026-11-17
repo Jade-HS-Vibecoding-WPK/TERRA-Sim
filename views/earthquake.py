@@ -5,6 +5,8 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
+from views.common import method_card
+
 from modules.hazards import CLASS_NAMES, collapse_scale
 from modules.viewer_webgpu import scene as vscene
 from views.common import (RADIO_OPTIONS, damage_colors, damage_legend, damage_tooltips, no_buildings,
@@ -63,6 +65,8 @@ def render():
     zone = official_quake_zone(model)
     odds_row(model, "quake", "Chance, dass am Standort mindestens die eingestellte Intensität erreicht wird.",
              side=(lambda: _zone_card(zone)) if zone else None)
+
+    method_card("quake")
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:

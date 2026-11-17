@@ -21,6 +21,7 @@ const DEFAULT_PAGE = 'starkwind';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const KIND_ICONS = { paper: '📚', norm: '📏', data: '🗂️' };
 const cache = {};
 let project, base, current = null;
 
@@ -93,6 +94,37 @@ function oddsBar(key) {
          `<div class="note">${esc(o.source)}</div></div>`;
 }
 
+function inline(text) {
+  return esc(text).replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+function methodHtml(m) {
+  const refLink = (n) => {
+    const s = m.sources[n - 1];
+    return s && s.link ? `<a href="${esc(s.link)}" target="_blank" rel="noopener">[${n}]</a>` : `[${n}]`;
+  };
+  const steps = m.steps.map((s) =>
+    `<li>${inline(s.text)} <span class="refs">${s.refs.map(refLink).join(' ')}</span>` +
+    (s.formula ? `<div class="formula" data-tex="${esc(s.formula)}"></div>` : '') + '</li>').join('');
+  const list = (items, icon = '') => '<ul>' + items.map((t) => `<li>${icon}${inline(t)}</li>`).join('') + '</ul>';
+  const sources = m.sources.map((s) => `<li>${KIND_ICONS[s.kind] || ''} ${esc(s.text)}` +
+    (s.link ? ` <a href="${esc(s.link)}" target="_blank" rel="noopener">${esc(s.link.replace('https://', ''))}</a>` : '') +
+    '</li>').join('');
+  return `<summary>🔬 Methode &amp; Quellen – so rechnet TERRA-Sim (${m.sources.length} Quellen)</summary>` +
+    `<div class="body"><p>${inline(m.summary)}</p><h4>Rechenweg</h4><ol>${steps}</ol>` +
+    (m.assumptions.length ? `<h4>Annahmen – von TERRA-Sim gesetzt, nicht aus der Literatur</h4>${list(m.assumptions, '⚙️ ')}` : '') +
+    (m.limits.length ? `<h4>Grenzen</h4>${list(m.limits)}` : '') +
+    `<h4>Quellen</h4><ol class="sources">${sources}</ol></div>`;
+}
+
+function renderFormulas(root) {
+  if (!window.katex) { setTimeout(() => renderFormulas(root), 300); return; }   // KaTeX lädt verzögert
+  root.querySelectorAll('.formula[data-tex]').forEach((el) => {
+    window.katex.render(el.dataset.tex, el, { displayMode: true, throwOnError: false });
+    el.removeAttribute('data-tex');
+  });
+}
+
 // ------------------------------------------------------------------ Seiten
 async function show(key) {
   if (!project.pages.some((p) => p.key === key)) key = DEFAULT_PAGE;
@@ -113,6 +145,11 @@ async function show(key) {
     `<div class="kpi"${m.help ? ` title="${esc(m.help)}"` : ''}><div class="lbl">${esc(m.label)}</div>` +
     `<div class="val">${esc(m.value)}</div></div>`).join('');
   $('legends').innerHTML = page.legends.join('');
+  const methods = await load('methods');
+  const method = $('method');
+  method.innerHTML = methods[key] ? methodHtml(methods[key]) : '';
+  method.style.display = methods[key] ? '' : 'none';
+  renderFormulas(method);
   sendScene({ ...base, ...page.scene });
 }
 

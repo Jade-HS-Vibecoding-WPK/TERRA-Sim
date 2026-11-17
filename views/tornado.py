@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import streamlit as st
 
+from views.common import method_card
+
 from modules.hazards import EF_GUST_MS, EF_PATH_WIDTH_M, TRANSLATION_MS, collapse_scale
 from modules.viewer_webgpu import scene as vscene
 from views.common import (damage_colors, damage_legend, damage_tooltips, legend_ramp, no_buildings, num,
@@ -51,6 +53,8 @@ def render():
 
     odds_row(model, "tornado", "Chance, dass ein Tornado dieser Stärke oder stärker das Gebiet streift.",
              side=_germany_card)
+
+    method_card("tornado")
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:

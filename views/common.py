@@ -569,6 +569,51 @@ def num(value: float, digits: int = 0) -> str:
     return text.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+KIND_ICONS = {"paper": "📚", "norm": "📏", "data": "🗂️"}
+
+
+def render_method(key: str):
+    """Rechenweg einer Analyse mit Formeln, Annahmen, Grenzen und nummerierten Quellen (modules/methods.py)."""
+    from modules.methods import METHODS
+    from modules.sources import SOURCES
+    method = METHODS[key]
+    keys = method.source_keys
+    number = {k: i + 1 for i, k in enumerate(keys)}
+
+    def refs(step_sources) -> str:
+        return " ".join(f"[[{number[k]}]]({SOURCES[k].link})" if SOURCES[k].link else f"[{number[k]}]"
+                        for k in step_sources)
+
+    st.markdown(method.summary)
+    st.markdown("**Rechenweg**")
+    for i, step in enumerate(method.steps, start=1):
+        st.markdown(f"{i}. {step.text} {refs(step.sources)}")
+        if step.formula:
+            st.latex(step.formula)
+    if method.assumptions:
+        st.markdown("**Annahmen** – von TERRA-Sim gesetzt, nicht aus der Literatur")
+        st.markdown("\n".join(f"- ⚙️ {a}" for a in method.assumptions))
+    if method.limits:
+        st.markdown("**Grenzen**")
+        st.markdown("\n".join(f"- {a}" for a in method.limits))
+    st.markdown("**Quellen**")
+    lines = []
+    for k in keys:
+        s = SOURCES[k]
+        link = f" [{s.link.replace('https://', '')}]({s.link})" if s.link else ""
+        lines.append(f"{number[k]}. {KIND_ICONS.get(s.kind, '')} {s.reference}{link}")
+    st.markdown("\n".join(lines))
+
+
+def method_card(key: str):
+    """Aufklappbare Karte „Methode & Quellen“ unter dem Kopf jeder Analyseseite."""
+    from modules.methods import METHODS
+    with st.expander(f"🔬 Methode & Quellen – so rechnet TERRA-Sim ({len(METHODS[key].source_keys)} Quellen)"):
+        render_method(key)
+        st.caption("Alle Quellen, Normen und Datensätze gesammelt (auch als BibTeX) unter **Methoden & Quellen** "
+                   "in der Seitenleiste.")
+
+
 def page_header(title: str, subtitle: str = ""):
     """Grüner Kopfbereich jeder Seite (Projekt, Titel, kurze Erklärung)."""
     model = get_model()

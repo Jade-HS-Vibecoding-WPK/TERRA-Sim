@@ -5,6 +5,8 @@ from __future__ import annotations
 import numpy as np
 import streamlit as st
 
+from views.common import method_card
+
 from modules.simulator import LC_BUILDING, LC_WATER
 from views.common import (GREY, ORANGE, RADIO_OPTIONS, building_tooltips, climate_info,
                           current_rain, legend_ramp, legend_swatches, num, page_header, rain_scenarios,
@@ -42,6 +44,8 @@ def render():
 
     odds_row(model, "rain", "Chance, dass mindestens diese Regenmenge in der gewählten Dauer fällt.",
              side=(lambda: _kostra_card(model)) if official_kostra(model) else None)
+
+    method_card("rain")
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:

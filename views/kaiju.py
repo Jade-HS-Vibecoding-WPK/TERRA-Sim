@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import streamlit as st
 
+from views.common import method_card
+
 from modules.hazards import collapse_scale
 from modules.viewer_webgpu import scene as vscene
 from views.common import (damage_colors, damage_legend, damage_tooltips, legend_ramp, no_buildings, num,
@@ -49,6 +51,8 @@ def render():
 
     odds_row(model, "kaiju", "Obergrenze: Chance, dass ein Kaiju dieser Größe genau durch dieses Gebiet läuft.",
              side=_how_card)
+
+    method_card("kaiju")
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:
