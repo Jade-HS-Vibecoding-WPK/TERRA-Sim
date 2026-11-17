@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TERRA-Sim · Live-Demo</title>
+  <meta name="description" content="TERRA-Sim: 3D-Stadtmodell aus offenen Daten und Katastrophen-Analysen mit amtlichen Wahrscheinlichkeiten – Live-Demo mit einem fertig berechneten Beispielgebiet.">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-top">
+      <img src="assets/icon.svg" alt="" class="logo"><span class="brand">TERRA<span>-Sim</span></span>
+      <span class="pill-live">Live-Demo</span>
+    </div>
+    <h1>Was passiert hier bei Hochwasser, Sturm – oder einem Kaiju?</h1>
+    <p class="lead">TERRA-Sim baut aus offenen Daten ein 3D-Stadtmodell und simuliert darauf Katastrophen – mit
+      amtlichen Daten dazu, wie wahrscheinlich jedes Szenario am Standort ist. Diese Demo zeigt ein fertig
+      berechnetes Beispielgebiet: <b id="project-name">…</b>.</p>
+    <div class="facts" id="project-facts"></div>
+    <div class="hero-links">
+      <a class="btn primary" href="https://github.com/Jade-HS-Vibecoding-WPK/TERRA-Sim">Code auf GitHub</a>
+      <a class="btn" href="#selbst-starten">Mit eigenem Gebiet starten</a>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="Analysen"></nav>
+
+  <main>
+    <section class="intro">
+      <h2 id="page-title">…</h2>
+      <p id="page-text"></p>
+      <p class="scenario"><span>Szenario</span> <b id="page-scenario"></b></p>
+    </section>
+
+    <section class="band" id="band"></section>
+
+    <section class="kpis" id="kpis"></section>
+
+    <section class="viewer-card">
+      <iframe id="viewer" src="viewer/index.html" title="TERRA-Sim 3D-Ansicht" allow="fullscreen"></iframe>
+      <p class="hint">Linke Maustaste: verschieben · rechte Taste: drehen und kippen · Rad: zoomen ·
+        Gebäude überfahren für Details</p>
+      <div id="legends"></div>
+    </section>
+
+    <section class="bottom">
+      <article class="card">
+        <h3>Wie wahrscheinlich ist was?</h3>
+        <p class="muted">Chance, dass das Szenario am Standort in den nächsten 30 Jahren mindestens einmal eintritt –
+          aus amtlichen Daten und Messreihen, bei Kaiju und Aliens aus Modellrechnungen mit Fachliteratur.
+          Rot = häufig (bis alle 30 Jahre), Orange = bis alle 300 Jahre, Grün = seltener.</p>
+        <div id="ranking"></div>
+      </article>
+      <article class="card mint" id="selbst-starten">
+        <h3>Selbst starten – mit deinem Gebiet</h3>
+        <p>Im vollen Werkzeug wählst du ein beliebiges Gebiet in Deutschland und stellst jedes Szenario selbst ein:
+          Pegel, Regenmenge, Windrichtung, Erdbebenstärke, Größe des Monsters … Die Demo zeigt die
+          Standard-Szenarien für ein Beispielgebiet.</p>
+        <pre><code>git clone https://github.com/Jade-HS-Vibecoding-WPK/TERRA-Sim
+cd TERRA-Sim
+pip install -r requirements.txt
+streamlit run app.py</code></pre>
+        <p class="muted">TERRA-Sim ist ein Streamlit-Werkzeug (Python). GitHub Pages kann nur statische Seiten
+          ausliefern – deshalb ist diese Demo vorberechnet, mit genau demselben Code und demselben 3D-Viewer.</p>
+      </article>
+    </section>
+  </main>
+
+  <footer>
+    <p><b>Daten:</b> Gebäude, Straßen, Grün- und Wasserflächen © OpenStreetMap-Mitwirkende (ODbL) ·
+      Gelände: <span id="terrain-source"></span> · Klima: <span id="climate-source"></span> ·
+      Wahrscheinlichkeiten: Deutscher Wetterdienst (KOSTRA-DWD-2020, Wind- und Böenmessungen, CC BY 4.0),
+      Erdbebenzonen GFZ Potsdam, Hochwassergefahrenkarten der Länder (BfG-Geoportal), Tornadostatistik
+      Beyer, Wapler &amp; Kühne (2025), Hanson et al. (2021), Snyder-Beattie et al. (2019), Hokkanen (1986),
+      Hanley &amp; Lippman-Hand (1983) · 3D: three.js</p>
+    <p>Heuristische Ersteinschätzung für die Lehre, kein Gutachten. Berechnet am <span id="built"></span> ·
+      Jade Hochschule, WPK „Thinking Architecture through Software Design“.</p>
+  </footer>
+
+  <script src="demo.js"></script>
+</body>
+</html>
