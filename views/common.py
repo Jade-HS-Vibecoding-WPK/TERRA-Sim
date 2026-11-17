@@ -754,7 +754,7 @@ def odds_line(odds: dict, source: str = "") -> str:
 def scenario_odds(model: Model) -> dict:
     """Wahrscheinlichkeit der aktuell eingestellten Szenarien: {Gefahr: (odds, Quelle)}.
 
-    Gefahren: flood, rain, wind, quake, tornado, fiction (Planspiele).
+    Gefahren: flood, rain, wind, quake, tornado, kaiju, alien (Planspiele, Modellrechnung).
     """
     from modules.hazards import EF_PATH_WIDTH_M
     from modules.likelihood import describe, tornado_return_period
@@ -764,8 +764,10 @@ def scenario_odds(model: Model) -> dict:
     T = tornado_return_period(int(_setting("tornado_ef")), max(width, height), EF_PATH_WIDTH_M)
     from modules.likelihood import TORNADO_SOURCE
     out["tornado"] = (describe(T), TORNADO_SOURCE)
-    out["fiction"] = ({"T": None, "p_year": 0.0, "p_life": None, "text": "Science-Fiction – keine Daten",
-                       "level": "none"}, "")
+    from modules.likelihood import ALIEN_SOURCE, KAIJU_SOURCE, alien_return_period, kaiju_return_period
+    swath = 0.5 * float(_setting("kaiju_height"))
+    out["kaiju"] = (describe(kaiju_return_period(max(width, height), swath), exact=True, bound=True), KAIJU_SOURCE)
+    out["alien"] = (describe(alien_return_period(), exact=True), ALIEN_SOURCE)
     out.update(_official_odds(model))
     return out
 
@@ -876,10 +878,13 @@ def odds_card(model: Model, key: str, explain: str = ""):
             st.caption(odds.get("text", "Für dieses Szenario liegen keine Daten zur Häufigkeit vor.")
                        if odds else "Für dieses Szenario liegen keine Daten zur Häufigkeit vor.")
             return
+        from modules.likelihood import one_in
+        tiny = odds["p_life"] < 0.001
         st.html(facts_html([
             ("Wie oft?", odds["text"], "im Mittel – nicht „genau alle …“"),
             (f"Chance in {LIFETIME_YEARS} Jahren", percent(odds["p_life"]),
-             f"mindestens einmal; pro Jahr {percent(odds['p_year'])}"),
+             (f"also {one_in(odds['p_life'])}" if tiny else "mindestens einmal")
+             + f"; pro Jahr {percent(odds['p_year'])}"),
         ]))
         if explain or source:
             st.caption(" ".join(t for t in (explain, f"Quelle: {source}." if source else "") if t))

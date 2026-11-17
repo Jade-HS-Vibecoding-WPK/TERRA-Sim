@@ -90,7 +90,8 @@ Zu jeder Gefahr nennt TERRA-Sim, wie oft das eingestellte Szenario am Standort v
 | Sturm | **DWD-Klimastationen**: tägliche Spitzenböe, Jahreshöchstwerte über Jahrzehnte; **DWD-Stundenwerte** (10 Jahre) für die Windrichtung | Gumbel-Verteilung der Jahreshöchstböen; geteilt durch den Anteil der Sturmstunden aus der gewählten Richtung |
 | Erdbeben | **Erdbebenzonen nach DIN 4149 / DIN EN 1998-1/NA** (Abfrage beim GFZ Potsdam) | Zone = Intensität, die alle 475 Jahre erreicht wird; andere Intensitäten über eine für Mitteleuropa typische Gefährdungskurve |
 | Tornado | **DWD/ESWD-Tornadostatistik 2000–2024** (Beyer, Wapler & Kühne 2025) | Tornados pro Jahr je Stärke × überstrichene Fläche, verteilt auf Deutschland |
-| Kaiju, Aliens | – | Science-Fiction, keine Daten 🙂 |
+| Aliens | Hanson et al. (2021), *Astrophysical Journal* 922:182 („Grabby Aliens“) | Expandierende Zivilisationen erreichen uns in etwa 1 Mrd. Jahren (Spanne 200 Mio. – 2 Mrd.) und übernehmen die ganze Erde → 30 Jahre: rund 0,000003 % |
+| Kaiju | Hokkanen (1986), *J. Theor. Biol.* 118:491; Hanley & Lippman-Hand (1983), *JAMA* 249:1743 | Obergrenze: In 370 Mio. Jahren Landleben kein Tier über ~100 t (Knochen versagen ab ~140 t) → höchstens 3 Kaijus in 370 Mio. Jahren („Rule of Three“) × Chance, dass die Schneise genau dieses Gebiet trifft |
 
 Alle Daten werden beim Anlegen des Projekts geladen und in `.cache/gov/` zwischengespeichert. Fällt ein Dienst aus, läuft die App ohne diese Angabe weiter.
 
@@ -239,6 +240,9 @@ TERRA-Sim liefert **Ersteinschätzungen für den Entwurf**, keine Gutachten.
 * **Tornado und Kaiju:** einfache geometrische Modelle (Abstand zur Bahn),
   keine Trümmerflug- oder Strömungsrechnung. Kaiju und Alien-Invasion sind
   Planspiele; die animierten Menschen sind Darstellung, keine Personenstrom-Simulation.
+  Ihre Wahrscheinlichkeiten sind Modellrechnungen: der Kaiju-Wert ist eine
+  Obergrenze aus dem Fossilbericht, der Alien-Wert hängt an den Annahmen des
+  „Grabby Aliens“-Modells.
 * **Starkwind:** geometrische Sichtlinien-Analyse für die Fassaden. Die Strömung
   am Boden ist eine Potentialströmung mit vereinfachtem Windschatten – keine
   CFD: keine Wirbel, keine Ablösung, keine Strömung über die Dächer hinweg.

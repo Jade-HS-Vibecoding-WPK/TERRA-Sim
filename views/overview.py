@@ -163,7 +163,7 @@ def render():
     with cols[2]:
         _damage_tile("👾 Kaiju-Angriff", f"{ss.kaiju_height} m groß, läuft nach "
                      f"{wind_direction_label(ss.kaiju_heading)} · {ss.kaiju_lasers} Laser, "
-                     f"{ss.kaiju_helis} Hubschrauber", kaiju.kpis, "kaiju", odds.get("fiction", ""))
+                     f"{ss.kaiju_helis} Hubschrauber", kaiju.kpis, "kaiju", odds.get("kaiju", ""))
 
     cols = st.columns([1, 2.3], gap="medium")
     with cols[0]:
@@ -175,10 +175,10 @@ def render():
             level, status = risk_level(alien.kpis["lifted"] / max(1, alien.kpis["buildings_total"]), 0.02, 0.1)
             _tile("🛸 Alien-Invasion", scenario, f"{alien.kpis['lifted']} von {alien.kpis['buildings_total']} Gebäuden",
                   "werden eingesaugt · Entführungen zählt die 3D-Ansicht", level, status, "alien",
-                  odds.get("fiction", ""))
+                  odds.get("alien", ""))
         else:
             _tile("🛸 Alien-Invasion", scenario, f"{ss.people_count} Menschen im Gebiet",
-                  "Entführungen zählt die 3D-Ansicht live mit", "none", "Planspiel", "alien", odds.get("fiction", ""))
+                  "Entführungen zählt die 3D-Ansicht live mit", "none", "Planspiel", "alien", odds.get("alien", ""))
     with cols[1]:
         _probability_card(model)
 
@@ -225,7 +225,7 @@ def render():
 # ---------------------------------------------------------------------------
 
 HAZARD_LABELS = {"flood": "🌊 Hochwasser", "rain": "🌧️ Starkregen", "wind": "💨 Sturm", "quake": "🫨 Erdbeben",
-                 "tornado": "🌪️ Tornado", "fiction": "👾🛸 Kaiju & Aliens"}
+                 "tornado": "🌪️ Tornado", "kaiju": "👾 Kaiju", "alien": "🛸 Aliens"}
 
 
 def _odds(model) -> dict:
@@ -249,6 +249,7 @@ def _probability_card(model):
     with card():
         st.markdown("**Wie wahrscheinlich ist was?**")
         st.caption("Chance, dass das eingestellte Szenario am Standort in den nächsten 30 Jahren mindestens "
-                   "einmal eintritt – aus amtlichen Daten und Messreihen. Rot = häufig (bis alle 30 Jahre), "
+                   "einmal eintritt – aus amtlichen Daten und Messreihen, bei Kaiju und Aliens aus "
+                   "Modellrechnungen mit Fachliteratur. Rot = häufig (bis alle 30 Jahre), "
                    "Lila = bis alle 300 Jahre, Grün = seltener.")
         st.html("".join(odds_bar(HAZARD_LABELS[key], o, src) for key, (o, src) in order))
