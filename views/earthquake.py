@@ -10,7 +10,7 @@ from modules.viewer_webgpu import scene as vscene
 from views.common import (RADIO_OPTIONS, damage_colors, damage_legend, damage_tooltips, no_buildings,
                           num, page_header, scene_for, show_scene)
 from views.common import current_quake
-from views.common import card, kpi_row, odds_card, official_quake_zone
+from views.common import card, facts_html, kpi_row, odds_row, official_quake_zone
 
 PRESETS = {
     "Spürbar · Mw 4,5 in 20 km": (4.5, 20),
@@ -34,6 +34,24 @@ def intensity_label(intensity: float) -> str:
     return f"{ROMAN[i]} – {INTENSITY_NAMES[i]}"
 
 
+SUBSOIL = {"R": "Fels oder felsartiger Untergrund",
+           "T": "Übergangsbereich, flache Sedimentbecken",
+           "S": "tiefe Beckenstruktur mit mächtigen Sedimenten"}
+
+
+def _zone_card(zone):
+    """Amtliche Erdbebenzone und Untergrundklasse am Ort (GFZ, DIN 4149)."""
+    with card("mint"):
+        st.markdown("**Erdbebenzone am Standort**")
+        items = [("Erdbebenzone", str(zone["zone"]) if zone["zone"] is not None else "keine",
+                  "Skala 0–3; außerhalb: sehr geringe Gefährdung")]
+        if zone.get("subsoil"):
+            items.append(("Untergrundklasse", zone["subsoil"], SUBSOIL.get(zone["subsoil"])))
+        items.append(("Ort", zone["place"], zone.get("postcode") or None))
+        st.html(facts_html(items))
+        st.caption("Quelle: GFZ Potsdam, Erdbebenzonen nach DIN 4149 – bezogen auf die Ortsmitte.")
+
+
 def render():
     from views.navigation import require_project
 
@@ -41,6 +59,10 @@ def render():
     page_header("Erdbeben", "Wie stark bebt es am Standort, und welche Gebäude werden beschädigt? "
                             "Makroseismische Methode nach der Europäischen Skala EMS-98.")
     b = model.buildings
+
+    zone = official_quake_zone(model)
+    odds_row(model, "quake", "Chance, dass am Standort mindestens die eingestellte Intensität erreicht wird.",
+             side=(lambda: _zone_card(zone)) if zone else None)
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:
@@ -60,11 +82,6 @@ def render():
         st.caption(f"Intensität am Standort **{intensity_label(k['intensity'])}** "
                    f"(im Epizentrum {intensity_label(k['epicentral_intensity'])}), "
                    f"Bodenbeschleunigung ca. {num(k['pga_g'], 2)} g.")
-        zone = official_quake_zone(model)
-        odds_card(model, "quake", (f"{zone['place']} liegt " + (f"in Erdbebenzone {zone['zone']}"
-                                   + (f" (Untergrundklasse {zone['subsoil']})" if zone.get("subsoil") else "")
-                                   if zone["zone"] is not None else "in keiner Erdbebenzone")
-                                   + ". Chance, dass mindestens diese Intensität erreicht wird.") if zone else "")
 
     with right:
         c = kpi_row(4)

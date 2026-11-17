@@ -11,7 +11,7 @@ from modules.simulator import flood_curve
 from modules.viewer_webgpu import scene as vscene
 from views.common import (GREY, RED, building_tooltips, current_flood, flood_references,
                           legend_swatches, no_buildings, num, page_header, scene_for, show_scene)
-from views.common import card, kpi_row, legend_ramp, odds_card, official_flood_impact
+from views.common import card, facts_html, kpi_row, legend_ramp, odds_row, official_flood_impact
 
 WATER = (38, 120, 220)
 OFFICIAL_LEVEL = {"L": 0.35, "M": 0.65, "H": 1.0}   # Heatmap-Wert je amtlichem Szenario
@@ -20,8 +20,6 @@ OFFICIAL_LEVEL = {"L": 0.35, "M": 0.65, "H": 1.0}   # Heatmap-Wert je amtlichem 
 def _official_card(model, impact):
     """Amtliche Hochwassergefahrenkarte: Szenarien, Wiederkehrzeit, betroffene Gebäude."""
     from modules.likelihood import LIFETIME_YEARS, describe, percent
-    odds_card(model, "flood", "Chance, dass Gebäude im Gebiet bei einem Flusshochwasser nass werden – "
-                              "nach den amtlichen Gefahrenkarten, unabhängig vom Pegel oben.")
     with card("mint"):
         st.markdown("**Amtliche Hochwassergefahrenkarte**")
         st.toggle("Überflutungsflächen im 3D-Modell zeigen", key="flood_official")
@@ -32,14 +30,14 @@ def _official_card(model, impact):
             st.caption("Das Gebiet liegt außerhalb aller amtlichen Überflutungsflächen von Flüssen "
                        "(Sturzfluten durch Starkregen sind darin nicht enthalten).")
             return
-        lines = []
+        items = []
         for key in ("H", "M", "L"):
             if key in impact:
                 v = impact[key]
                 d = describe(v["T"])
-                lines.append(f"- **{v['name']}** (etwa alle {v['T']} Jahre, {percent(d['p_life'])} in "
-                             f"{LIFETIME_YEARS} J.): {num(v['share'] * 100)} % der Fläche, **{v['buildings']} Gebäude**")
-        st.markdown("\n".join(lines))
+                items.append((f"{v['name']} · {d['text']}", f"{v['buildings']} Gebäude",
+                              f"{num(v['share'] * 100)} % der Fläche; {percent(d['p_life'])} in {LIFETIME_YEARS} Jahren"))
+        st.html(facts_html(items))
         st.caption("Quelle: Hochwassergefahrenkarten der Länder nach EU-Hochwasserrisikomanagement-Richtlinie, "
                    "BfG-Geoportal. Die Flächen enthalten auch das Flussbett.")
 
@@ -63,6 +61,11 @@ def render():
         st.session_state.flood_ref = next(iter(refs))
     b = model.buildings
 
+    impact = official_flood_impact(model)
+    odds_row(model, "flood", "Chance, dass Gebäude im Gebiet bei einem Flusshochwasser nass werden – nach den "
+                             "amtlichen Gefahrenkarten, unabhängig vom eingestellten Pegel.",
+             side=lambda: _official_card(model, impact))
+
     left, right = st.columns([1, 2.6], gap="large")
     with left:
         with card():
@@ -75,8 +78,6 @@ def render():
         st.caption(f"Wasserspiegel: {num(level, 1)} m ü. NHN (Bezugsniveau {num(base, 1)} m).")
         if model.dem.source == "flach":
             st.warning("Ohne Geländehöhen ist das Ergebnis nicht aussagekräftig.")
-        impact = official_flood_impact(model)
-        _official_card(model, impact)
 
     with right:
         c = kpi_row(4)

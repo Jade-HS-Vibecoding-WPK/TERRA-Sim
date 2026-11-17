@@ -838,6 +838,33 @@ def rain_duration_min(label: str) -> int:
     return RAIN_DURATION_MIN.get(st.session_state.get("rain_duration"), 1440)
 
 
+def facts_html(items) -> str:
+    """Große Kennzahlen, die umbrechen statt abgeschnitten zu werden (anders als ``st.metric``).
+
+    ``items`` = [(Bezeichnung, Wert, Erläuterung oder None), …]
+    """
+    parts = []
+    for label, value, note in items:
+        sub = f'<div class="note">{html.escape(note)}</div>' if note else ""
+        parts.append(f'<div class="terra-fact"><div class="lbl">{html.escape(label)}</div>'
+                     f'<div class="val">{html.escape(value)}</div>{sub}</div>')
+    return f'<div class="terra-facts">{"".join(parts)}</div>'
+
+
+def odds_row(model: Model, key: str, explain: str = "", side=None):
+    """Reihe über die volle Breite unter dem Seitenkopf: links „Wie wahrscheinlich?“,
+    rechts optional eine Karte mit den amtlichen Daten dazu (``side`` = Funktion ohne Argumente)."""
+    with st.container(key=_next_key("band")):
+        if side is None:
+            odds_card(model, key, explain)
+            return
+        a, b = st.columns([1, 1.15], gap="medium")
+        with a:
+            odds_card(model, key, explain)
+        with b:
+            side()
+
+
 def odds_card(model: Model, key: str, explain: str = ""):
     """Karte „Wie wahrscheinlich?“ für eine Analyseseite (Gefahr ``key``, siehe scenario_odds)."""
     from modules.likelihood import LIFETIME_YEARS, percent
@@ -849,11 +876,10 @@ def odds_card(model: Model, key: str, explain: str = ""):
             st.caption(odds.get("text", "Für dieses Szenario liegen keine Daten zur Häufigkeit vor.")
                        if odds else "Für dieses Szenario liegen keine Daten zur Häufigkeit vor.")
             return
-        c = st.columns(2)
-        c[0].metric("Wiederkehrzeit", odds["text"].replace("etwa alle ", "~ "),
-                    help="Im Mittel einmal in so vielen Jahren – nicht „genau dann“.")
-        c[1].metric(f"In {LIFETIME_YEARS} Jahren", percent(odds["p_life"]),
-                    help=f"Wahrscheinlichkeit, dass es in den nächsten {LIFETIME_YEARS} Jahren mindestens einmal "
-                         f"passiert (pro Jahr: {percent(odds['p_year'])}).")
+        st.html(facts_html([
+            ("Wie oft?", odds["text"], "im Mittel – nicht „genau alle …“"),
+            (f"Chance in {LIFETIME_YEARS} Jahren", percent(odds["p_life"]),
+             f"mindestens einmal; pro Jahr {percent(odds['p_year'])}"),
+        ]))
         if explain or source:
             st.caption(" ".join(t for t in (explain, f"Quelle: {source}." if source else "") if t))

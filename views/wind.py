@@ -14,7 +14,7 @@ from modules.viewer_webgpu import scene as vscene
 from views.common import (GREY, RADIO_OPTIONS, current_wind, current_wind_field, legend_ramp,
                           legend_swatches, no_buildings, num, page_header, scene_for, scene_origin,
                           show_scene, wind_direction_label, wind_presets)
-from views.common import card, kpi_row, measured_direction_stats, measured_wind, odds_card
+from views.common import card, facts_html, kpi_row, measured_direction_stats, measured_wind, odds_row
 
 VENTURI_COLOR = (214, 39, 180)
 
@@ -62,18 +62,17 @@ def _measured_wind_card(model, direction: int, beaufort: int):
         if not stats:
             st.caption("Für diesen Standort gibt es keine stündlichen Windmessungen.")
             return
-        c = st.columns(2)
-        c[0].metric(f"Wind aus {stats['sector']}", f"{num(stats['share_from_dir'], 1)} %",
-                    help="Anteil aller Stunden mit Wind, in denen er aus dieser Richtung (± 11°) kommt")
-        c[1].metric(f"Bft {beaufort} oder mehr", f"{num(stats['strong_hours_per_year'])} h/Jahr",
-                    help="Stunden pro Jahr, in denen schon das Stundenmittel diese Stärke erreicht (aus allen "
-                         "Richtungen). Böen sind kurzzeitig deutlich stärker – die Sturm-Wahrscheinlichkeit oben "
-                         "rechnet deshalb mit den gemessenen Spitzenböen.")
+        items = [(f"Wind aus {stats['sector']}", f"{num(stats['share_from_dir'], 1)} %",
+                  "aller Stunden kommt der Wind aus dieser Richtung (± 11°)")]
         if beaufort > 0:
-            st.caption(f"Davon aus {stats['sector']}: {num(stats['strong_from_dir_hours_per_year'], 1)} Stunden pro "
-                       f"Jahr ({num(stats['share_strong_from_dir'])} % der Starkwind-Stunden). Stärkstes "
-                       f"Stundenmittel im Messzeitraum: {num(stats['max_kmh'])} km/h. "
-                       f"Quelle: {stats['source']}, {num(stats['years'], 1)} Jahre Stundenwerte.")
+            items += [(f"Bft {beaufort} oder mehr", f"{num(stats['strong_hours_per_year'])} h pro Jahr",
+                       "Stundenmittel, aus allen Richtungen"),
+                      (f"Davon aus {stats['sector']}", f"{num(stats['strong_from_dir_hours_per_year'], 1)} h pro Jahr",
+                       f"{num(stats['share_strong_from_dir'])} % dieser Stunden")]
+        st.html(facts_html(items))
+        st.caption(f"Stärkstes Stundenmittel im Messzeitraum: {num(stats['max_kmh'])} km/h. Böen sind kurzzeitig "
+                   "deutlich stärker – die Sturm-Wahrscheinlichkeit links rechnet deshalb mit den gemessenen "
+                   f"Spitzenböen. Quelle: {stats['source']}, {num(stats['years'], 1)} Jahre Stundenwerte.")
 
 
 def _rose_layer(model):
@@ -101,6 +100,11 @@ def render():
                              "beschleunigt, und wie strömt die Luft am Boden durch die Stadt?")
     b = model.buildings
 
+    _, direction, beaufort = current_wind(model)
+    odds_row(model, "wind", "Chance, dass ein Sturm dieser Stärke aus dieser Richtung kommt "
+                            "(Böen-Messreihe und gemessene Windrichtungen).",
+             side=lambda: _measured_wind_card(model, direction, beaufort))
+
     left, right = st.columns([1, 2.6], gap="large")
     with left:
         presets = wind_presets(model)
@@ -123,9 +127,6 @@ def render():
             k = result.kpis
             st.caption(f"Wind aus **{wind_direction_label(direction)}** · **{BEAUFORT_NAMES[beaufort]}**, "
                        f"ca. {num(k['speed_kmh'])} km/h in 10 m Höhe")
-        odds_card(model, "wind", "Chance, dass ein Sturm dieser Stärke aus dieser Richtung kommt "
-                                 "(Böen-Messreihe und gemessene Windrichtungen).")
-        _measured_wind_card(model, direction, beaufort)
         field = current_wind_field(model)
         fk = field.kpis
         with card():
