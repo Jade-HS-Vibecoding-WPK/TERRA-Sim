@@ -28,12 +28,11 @@ from modules.terrain_loader import DemGrid, flat_dem, load_dem
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 PROJECT_FILE_VERSION = 1
 
-# Farben: Grün = Normalzustand, Lila = Warnung, Rot = Gefahr/Schaden (wie assets/style.css)
+# Farben: Grün = Normalzustand, Orange = Warnung, Rot = Gefahr/Schaden (wie assets/style.css)
 GREY = (222, 226, 218)          # unbeschädigte Gebäude (leicht grünliches Hellgrau)
 RED = (211, 58, 58)             # Gebäude im Wasser, Gefahr
-PURPLE = (126, 59, 176)         # Warnung, z. B. Rückstau-Risiko beim Starkregen
-ORANGE = PURPLE                 # (alter Name, für Kompatibilität)
-SOURCE_COLORS = {"OSM-Höhe": (47, 158, 95), "OSM-Geschosse": (159, 214, 179), "Schätzung": (176, 120, 214)}
+ORANGE = (240, 140, 40)         # Warnung, z. B. Rückstau-Risiko beim Starkregen
+SOURCE_COLORS = {"OSM-Höhe": (47, 158, 95), "OSM-Geschosse": (159, 214, 179), "Schätzung": (240, 180, 90)}
 
 STANDARD_RAIN = {
     "Starkregen (30 l/m²)": 30,
@@ -337,7 +336,7 @@ def current_kaiju(model: Model):
 
 
 # Schadensgrad 0..5 -> Farbe (0 = Grau wie unbeschädigte Gebäude)
-DAMAGE_COLORS = [GREY, (214, 190, 236), (164, 104, 212), (214, 72, 96), (190, 30, 45), (96, 12, 30)]
+DAMAGE_COLORS = [GREY, (250, 222, 100), (246, 162, 62), (226, 88, 46), (178, 30, 42), (84, 18, 32)]
 
 
 def damage_colors(damage) -> np.ndarray:
@@ -603,7 +602,7 @@ def _next_key(prefix: str) -> str:
 
 def card(tone: str = "plain", height=None):
     """Bento-Karte: ``plain`` (weiß), ``mint`` (hellgrün), ``dark`` (dunkelgrün),
-    ``warn`` (lila) oder ``risk`` (rot). Gebrauch: ``with card(): …``"""
+    ``warn`` (orange) oder ``risk`` (rot). Gebrauch: ``with card(): …``"""
     tone = tone if tone in CARD_TONES else "plain"
     kwargs = {"height": height} if height else {}
     return st.container(key=_next_key(f"card-{tone}"), **kwargs)
@@ -724,7 +723,7 @@ def wind_direction_label(direction: float) -> str:
 # Wahrscheinlichkeit eines Szenarios (siehe modules/likelihood.py)
 # ---------------------------------------------------------------------------
 
-ODDS_COLORS = {"risk": "#d33a3a", "warn": "#7e3bb0", "ok": "#2f9e5f", "none": "#9fb5a8"}
+ODDS_COLORS = {"risk": "#d33a3a", "warn": "#f08c28", "ok": "#2f9e5f", "none": "#9fb5a8"}
 
 
 def odds_bar(label: str, odds: dict, note: str = "") -> str:
@@ -754,7 +753,7 @@ def odds_line(odds: dict, source: str = "") -> str:
 def scenario_odds(model: Model) -> dict:
     """Wahrscheinlichkeit der aktuell eingestellten Szenarien: {Gefahr: (odds, Quelle)}.
 
-    Gefahren: flood, rain, wind, quake, tornado, fiction (Planspiele).
+    Gefahren: flood, rain, wind, quake, tornado, kaiju, alien (Planspiele, Modellrechnung).
     """
     from modules.hazards import EF_PATH_WIDTH_M
     from modules.likelihood import describe, tornado_return_period
@@ -764,8 +763,10 @@ def scenario_odds(model: Model) -> dict:
     T = tornado_return_period(int(_setting("tornado_ef")), max(width, height), EF_PATH_WIDTH_M)
     from modules.likelihood import TORNADO_SOURCE
     out["tornado"] = (describe(T), TORNADO_SOURCE)
-    out["fiction"] = ({"T": None, "p_year": 0.0, "p_life": None, "text": "Science-Fiction – keine Daten",
-                       "level": "none"}, "")
+    from modules.likelihood import ALIEN_SOURCE, KAIJU_SOURCE, alien_return_period, kaiju_return_period
+    swath = 0.5 * float(_setting("kaiju_height"))
+    out["kaiju"] = (describe(kaiju_return_period(max(width, height), swath), exact=True, bound=True), KAIJU_SOURCE)
+    out["alien"] = (describe(alien_return_period(), exact=True), ALIEN_SOURCE)
     out.update(_official_odds(model))
     return out
 
@@ -876,10 +877,13 @@ def odds_card(model: Model, key: str, explain: str = ""):
             st.caption(odds.get("text", "Für dieses Szenario liegen keine Daten zur Häufigkeit vor.")
                        if odds else "Für dieses Szenario liegen keine Daten zur Häufigkeit vor.")
             return
+        from modules.likelihood import one_in
+        tiny = odds["p_life"] < 0.001
         st.html(facts_html([
             ("Wie oft?", odds["text"], "im Mittel – nicht „genau alle …“"),
             (f"Chance in {LIFETIME_YEARS} Jahren", percent(odds["p_life"]),
-             f"mindestens einmal; pro Jahr {percent(odds['p_year'])}"),
+             (f"also {one_in(odds['p_life'])}" if tiny else "mindestens einmal")
+             + f"; pro Jahr {percent(odds['p_year'])}"),
         ]))
         if explain or source:
             st.caption(" ".join(t for t in (explain, f"Quelle: {source}." if source else "") if t))

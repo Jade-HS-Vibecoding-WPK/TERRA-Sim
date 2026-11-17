@@ -11,7 +11,7 @@ from modules.climate_loader import (BEAUFORT_KMH, annual_extremes, kmh_to_beaufo
 from views.common import climate_info, num, page_header, rain_scenarios, wind_direction_label
 from views.common import card, kpi_row
 
-ROSE_COLORS = ["#c8eacf", "#4fae78", "#8e4cc4", "#d33a3a"]   # ruhig = grün, stark = lila, Sturm = rot
+ROSE_COLORS = ["#c8eacf", "#74c476", "#f46d43", "#a50026"]   # ruhig = grün, stark = orange, Sturm = rot
 
 PARAMETER_NAMES = {"temp": "Temperatur", "tmin": "Tiefsttemperatur", "tmax": "Höchsttemperatur",
                    "prcp": "Niederschlag", "wspd": "Wind (Tagesmittel)", "wpgt": "Böen",

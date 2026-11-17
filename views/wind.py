@@ -58,7 +58,7 @@ def _measured_wind_card(model, direction: int, beaufort: int):
         st.markdown("**Woher der Wind wirklich kommt**")
         st.toggle("Windrose aus Messdaten im 3D-Modell", key="wind_rose",
                   help="Kranz um den Sockel: je Richtung, aus der der Wind kommt, ein Balken – Länge = "
-                       "Häufigkeit, Farbe = Windstärke (grün ruhig, lila stark, rot Sturm).")
+                       "Häufigkeit, Farbe = Windstärke (grün ruhig, orange stark, rot Sturm).")
         if not stats:
             st.caption("Für diesen Standort gibt es keine stündlichen Windmessungen.")
             return

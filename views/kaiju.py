@@ -9,7 +9,7 @@ from modules.viewer_webgpu import scene as vscene
 from views.common import (damage_colors, damage_legend, damage_tooltips, legend_ramp, no_buildings, num,
                           page_header, scene_for, scene_origin, show_scene, wind_direction_label)
 from views.common import current_kaiju
-from views.common import card, kpi_row, odds_card
+from views.common import card, facts_html, kpi_row, odds_row
 
 PRESETS = {"Jungtier · 30 m": 30, "Ausgewachsen · 80 m": 80, "Titan · 150 m": 150}
 
@@ -18,12 +18,37 @@ def _apply(height: int):
     st.session_state.kaiju_height = height
 
 
+def _how_card():
+    """So entsteht die Kaiju-Wahrscheinlichkeit: Fossilbericht, Knochenstatik, Schneise."""
+    from modules.likelihood import (BONE_LIMIT_T, KAIJU_RAMPAGE_KM, LAND_LIFE_YEARS, LARGEST_LAND_ANIMAL_T,
+                                    big_number, kaiju_mass_t, kaiju_rate_world)
+    h = int(st.session_state.kaiju_height)
+    mass = kaiju_mass_t(h)
+    with card("mint"):
+        st.markdown("**So entsteht die Zahl**")
+        st.html(facts_html([
+            ("Schwerstes Landtier aller Zeiten", f"≈ {num(LARGEST_LAND_ANIMAL_T)} t",
+             f"Sauropoden; Knochen halten bis ≈ {num(BONE_LIMIT_T)} t (Hokkanen 1986)"),
+            (f"Dieses Kaiju ({h} m)", f"≈ {big_number(mass)} t",
+             f"rund {num(mass / BONE_LIMIT_T)}-mal zu schwer für Knochen"),
+            ("Kaijus weltweit", f"höchstens 1 in {big_number(1 / kaiju_rate_world())} Jahren",
+             f"0 Fälle in {big_number(LAND_LIFE_YEARS)} Jahren Landleben → „Rule of Three“"),
+        ]))
+        st.caption(f"Dann muss es noch genau dieses Gebiet treffen: Schneise {KAIJU_RAMPAGE_KM:.0f} km lang "
+                   "(Annahme wie im Film), verteilt auf die Landfläche der Erde. Zum Vergleich: Das Universum ist "
+                   "erst 13,8 Mrd. Jahre alt. Quellen: Hokkanen (1986), J. Theor. Biol. "
+                   "118:491; Hanley & Lippman-Hand (1983), JAMA 249:1743.")
+
+
 def render():
     from views.navigation import require_project
 
     model = require_project()
     page_header("Kaiju-Angriff", "Planspiel: Ein Riesenmonster läuft quer durch das Gebiet. Welche "
                                  "Gebäude liegen in der Schneise, und wo bieten hohe Häuser Deckung?")
+
+    odds_row(model, "kaiju", "Obergrenze: Chance, dass ein Kaiju dieser Größe genau durch dieses Gebiet läuft.",
+             side=_how_card)
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:
@@ -50,8 +75,6 @@ def render():
                    f"{num(0.45 * h)} m weit, die Schritte erschüttern bis {num(0.8 * h)} m.")
         st.caption("Ein Spaß-Szenario für die Lehre – es zeigt, wie man eine Gefahr mit Weg, Reichweite "
                    "und Schadensstufen modelliert. Das Monster ist eine eigene Figur.")
-
-        odds_card(model, "fiction")
 
     with right:
         c = kpi_row(4)

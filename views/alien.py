@@ -7,7 +7,7 @@ import streamlit as st
 from modules.hazards import MOTHERSHIP_SIZE_M
 from modules.viewer_webgpu import scene as vscene
 from views.common import GREY, current_alien, num, page_header, scene_for, scene_origin, show_scene
-from views.common import card, kpi_row, odds_card
+from views.common import card, facts_html, kpi_row, odds_row
 
 PRESETS = {"Erkundung · 1 kleines UFO": (1, 20, 50), "Invasion · 3 UFOs": (3, 30, 60),
            "Mutterschiff · 1 riesiges UFO": (1, 80, 120)}
@@ -19,6 +19,25 @@ def _apply(count: int, size: int, height: int):
     st.session_state.alien_height = height
 
 
+def _how_card():
+    """So entsteht die Alien-Wahrscheinlichkeit (Hanson et al. 2021)."""
+    from modules.likelihood import ALIEN_ARRIVAL_RANGE, ALIEN_ARRIVAL_YEARS, NATURAL_EXTINCTION_YEARS, big_number
+    low, high = ALIEN_ARRIVAL_RANGE
+    with card("mint"):
+        st.markdown("**So entsteht die Zahl**")
+        st.html(facts_html([
+            ("Erstkontakt mit expandierenden Aliens", f"in ≈ {big_number(ALIEN_ARRIVAL_YEARS)} Jahren",
+             f"Spanne {big_number(low)} – {big_number(high)} Jahre"),
+            ("Betroffen", "die ganze Erde", "wer sich so ausbreitet, übernimmt alles, was er erreicht"),
+            ("Zum Vergleich", f"1 zu {big_number(NATURAL_EXTINCTION_YEARS)} pro Jahr",
+             "alle natürlichen Katastrophen zusammen, die die Menschheit auslöschen könnten (Obergrenze)"),
+        ]))
+        st.caption("Das Modell erklärt, warum die Menschheit so früh in der Geschichte des Universums auftaucht: "
+                   "Laute, sich ausbreitende Zivilisationen füllen das All und lassen später keinen Platz mehr. "
+                   "Quellen: Hanson, Martin, McCarter & Paulson (2021), Astrophysical Journal 922:182; "
+                   "Snyder-Beattie, Ord & Bonsall (2019), Scientific Reports 9:11054.")
+
+
 def render():
     from views.navigation import require_project
 
@@ -28,6 +47,9 @@ def render():
     ss = st.session_state
     raster = model.raster
     extent = max(raster.nx, raster.ny) * raster.cell
+
+    odds_row(model, "alien", "Chance, dass sich ausbreitende Aliens die Erde erreichen – nach einem "
+                             "astrophysikalischen Modell, nicht nach UFO-Sichtungen.", side=_how_card)
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:
@@ -53,8 +75,6 @@ def render():
                        "zum Mutterschiff und saugt auch Gebäude ein.")
         st.caption("Wer in der Nähe ist, rennt weg – wer im Strahl steht, schwebt nach oben; der Zähler unten "
                    "rechts in der 3D-Ansicht zählt mit. Mit „Nik folgen“ sieht man, ob Nik entkommt.")
-
-        odds_card(model, "fiction")
 
     with right:
         c = kpi_row(4)

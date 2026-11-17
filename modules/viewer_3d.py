@@ -34,12 +34,12 @@ LANDCOVER_COLORS = np.array([
     [126, 176, 222],   # Wasser
 ], dtype=float)
 
-# Farbskalen (TERRA-Sim-Design): Grün = unbedenklich, Lila = Warnung, Rot = Gefahr.
+# Farbskalen (TERRA-Sim-Design): Grün/Gelb = unbedenklich, Orange = Warnung, Rot = Gefahr.
 # Wasser bleibt blau, Gebäudehöhe ist eine neutrale Grün-Skala.
 COLOR_RAMPS = {
-    "heat": [(226, 206, 243), (164, 104, 212), (214, 58, 82), (110, 10, 32)],
+    "heat": [(255, 237, 160), (254, 178, 76), (240, 59, 32), (128, 0, 38)],
     "water": [(198, 219, 239), (107, 174, 214), (33, 113, 181), (8, 48, 107)],
-    "wind": [(98, 184, 120), (196, 160, 230), (140, 70, 196), (200, 32, 52)],
+    "wind": [(116, 196, 118), (255, 217, 79), (244, 109, 67), (165, 0, 38)],
     "height": [(226, 243, 230), (159, 214, 179), (47, 158, 95), (20, 83, 45)],
 }
 
