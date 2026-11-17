@@ -180,6 +180,32 @@ def _render_page():
         json.dump(out, f, ensure_ascii=False, default=str)
 
 
+# Reiter der Demo -> Rechenweg in modules/methods.py
+METHOD_KEYS = {"modell": "model", "hochwasser": "flood", "starkregen": "rain", "starkwind": "wind",
+               "erdbeben": "quake", "tornado": "tornado", "kaiju": "kaiju", "aliens": "alien"}
+
+
+def write_methods():
+    """Rechenwege und Quellen für die Karte „Methode & Quellen“ der Demo (demo/data/methods.json)."""
+    from modules.methods import METHODS
+    from modules.sources import SOURCES
+    out = {}
+    for page, key in METHOD_KEYS.items():
+        m = METHODS[key]
+        keys = m.source_keys
+        out[page] = {
+            "title": m.title, "summary": m.summary,
+            "steps": [{"text": s.text, "formula": s.formula, "refs": [keys.index(k) + 1 for k in s.sources]}
+                      for s in m.steps],
+            "assumptions": list(m.assumptions), "limits": list(m.limits),
+            "sources": [{"kind": SOURCES[k].kind, "text": SOURCES[k].reference, "link": SOURCES[k].link}
+                        for k in keys],
+        }
+    OUT.mkdir(parents=True, exist_ok=True)
+    _write(OUT / "methods.json", out)
+    print(f"Methoden: {len(out)} Seiten, {len(SOURCES)} Quellen")
+
+
 def build(name: str, lat: float, lon: float, side: float, only: list[str] | None = None):
     from streamlit.testing.v1 import AppTest
 
@@ -222,6 +248,7 @@ def build(name: str, lat: float, lon: float, side: float, only: list[str] | None
         pages.append({"key": key, "title": title, "odds_key": r["odds_key"]})
     _write(OUT / "project.json", {"project": last["project"], "odds": last["odds"], "pages": pages,
                                   "built": time.strftime("%Y-%m-%d")})
+    write_methods()
     total = sum(p.stat().st_size for p in OUT.glob("*.json"))
     print(f"Fertig: {OUT} ({total / 1e6:.1f} MB)")
 
@@ -237,6 +264,11 @@ if __name__ == "__main__":
     parser.add_argument("--lon", type=float, default=8.0884)
     parser.add_argument("--side", type=float, default=600, help="Kantenlänge des Gebiets in Metern")
     parser.add_argument("--only", nargs="*", help="nur diese Seiten neu rechnen (Rest aus .cache/demo)")
+    parser.add_argument("--methods-only", action="store_true",
+                        help="nur Rechenwege und Quellen neu schreiben (schnell, ohne Netz)")
     args = parser.parse_args()
     sys.path.insert(0, str(ROOT))
-    build(args.name, args.lat, args.lon, args.side, args.only)
+    if args.methods_only:
+        write_methods()
+    else:
+        build(args.name, args.lat, args.lon, args.side, args.only)

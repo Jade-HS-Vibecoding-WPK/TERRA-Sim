@@ -26,8 +26,8 @@ SECTIONS = [
 
 def register() -> dict:
     """Legt alle Seiten an (bei jedem Durchlauf neu, das ist bei Streamlit üblich)."""
-    from views import (alien, climate, earthquake, flood, kaiju, model3d, overview, rain, setup, tornado,
-                       wind)
+    from views import (alien, climate, earthquake, flood, kaiju, literature, model3d, overview, rain, setup,
+                       tornado, wind)
 
     PAGES.clear()
     PAGES.update({
@@ -53,6 +53,8 @@ def register() -> dict:
                          url_path="kaiju"),
         "alien": st.Page(alien.render, title="Alien-Invasion", icon=":material/rocket:",
                          url_path="aliens"),
+        "literature": st.Page(literature.render, title="Methoden & Quellen", icon=":material/menu_book:",
+                              url_path="quellen"),
     })
     return PAGES
 
@@ -109,6 +111,8 @@ def sidebar():
             st.slider("Menschen im Gebiet", 0, 1000, step=25, key="people_count",
                       help="Animierte Figuren in der 3D-Ansicht, 0 = aus. Die mit dem Afro ist Nik – "
                            "„Nik folgen“ in der 3D-Ansicht hängt die Kamera an ihn.")
+        st.html('<div class="terra-nav-title">Wissen</div>')
+        st.page_link(PAGES["literature"], label="Methoden & Quellen", icon=":material/menu_book:")
 
         st.divider()
         current = get_model()

@@ -5,6 +5,8 @@ from __future__ import annotations
 import numpy as np
 import streamlit as st
 
+from views.common import method_card
+
 import shapely
 
 from modules import viewer_3d
@@ -104,6 +106,8 @@ def render():
     odds_row(model, "wind", "Chance, dass ein Sturm dieser Stärke aus dieser Richtung kommt "
                             "(Böen-Messreihe und gemessene Windrichtungen).",
              side=lambda: _measured_wind_card(model, direction, beaufort))
+
+    method_card("wind")
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:

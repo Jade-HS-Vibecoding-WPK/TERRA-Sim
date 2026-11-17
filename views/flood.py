@@ -7,6 +7,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from views.common import method_card
+
 from modules.simulator import flood_curve
 from modules.viewer_webgpu import scene as vscene
 from views.common import (GREY, RED, building_tooltips, current_flood, flood_references,
@@ -65,6 +67,8 @@ def render():
     odds_row(model, "flood", "Chance, dass Gebäude im Gebiet bei einem Flusshochwasser nass werden – nach den "
                              "amtlichen Gefahrenkarten, unabhängig vom eingestellten Pegel.",
              side=lambda: _official_card(model, impact))
+
+    method_card("flood")
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:

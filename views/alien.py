@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import streamlit as st
 
+from views.common import method_card
+
 from modules.hazards import MOTHERSHIP_SIZE_M
 from modules.viewer_webgpu import scene as vscene
 from views.common import GREY, current_alien, num, page_header, scene_for, scene_origin, show_scene
@@ -50,6 +52,8 @@ def render():
 
     odds_row(model, "alien", "Chance, dass sich ausbreitende Aliens die Erde erreichen – nach einem "
                              "astrophysikalischen Modell, nicht nach UFO-Sichtungen.", side=_how_card)
+
+    method_card("alien")
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:
