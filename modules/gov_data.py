@@ -324,6 +324,13 @@ def quake_zone(lat: float, lon: float, timeout: float = 30) -> dict:
 
     text = ask(place["name"], place["postcode"])
     sentence = re.search(r"gehört[^.]{0,200}\.", text)
+    if not sentence and place["postcode"]:
+        # Das GFZ kennt je Ort nur die Postleitzahl der Ortsmitte – ohne PLZ noch einmal fragen
+        text = ask(place["name"], "")
+        sentence = re.search(r"gehört[^.]{0,200}\.", text)
+        postcode = re.search(r"\(PLZ: (\d{5})\) in", text)
+        if sentence and postcode:
+            place = {**place, "postcode": postcode.group(1)}
     if not sentence:
         # mehrere gleichnamige Orte: den mit der nächstgelegenen Ortsmitte nehmen
         rows = re.findall(r"([A-ZÄÖÜ][^°]*?) (?:Baden-Württemberg|Bayern|Berlin|Brandenburg|Bremen|Hamburg|Hessen|"

@@ -660,28 +660,42 @@ function makeWindRose(rose, box, bottom) {
   const scale = (state.radius * 0.45) / Math.max(1e-6, Math.max(...totals));   // längster Balken = 45 % des Radius
   const sector = 360 / rose.angles.length;
   const mats = rose.colors.map(([r, g, b]) => new THREE.MeshStandardMaterial({
-    color: srgb(r, g, b), roughness: 0.85, side: THREE.DoubleSide }));
+    color: srgb(r, g, b), roughness: 0.85 }));
+  // Als flache, erhabene Scheibe auf dem Tisch: Eine dünne Fläche knapp über dem Tisch
+  // flackert bei großen Gebieten in den Boden (zu wenig Tiefengenauigkeit der Kamera).
+  const height = Math.max(1.2, state.plinth * 0.18);
+  const slab = (shape, depth, material) => {
+    const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 10 });
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.rotation.x = -Math.PI / 2;            // Form liegt in der Ebene, Extrusion zeigt nach oben
+    mesh.position.set(cx, bottom, cz);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  };
+  const span = THREE.MathUtils.degToRad(sector * 0.84);
   rose.angles.forEach((deg, k) => {
     let inner = r0;
     const theta = THREE.MathUtils.degToRad(90 - deg - sector * 0.42);   // Kompass -> Kreiswinkel der Ebene
     rose.shares[k].forEach((share, c) => {
       const len = share * scale;
       if (len < 0.2) return;
-      const ring = new THREE.Mesh(new THREE.RingGeometry(inner, inner + len, 1, 1, theta,
-                                                         THREE.MathUtils.degToRad(sector * 0.84)), mats[c]);
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.set(cx, bottom + 0.4 + c * 0.05, cz);
-      ring.receiveShadow = true;
-      group.add(ring);
+      const shape = new THREE.Shape();
+      shape.absarc(0, 0, inner + len, theta, theta + span, false);
+      shape.absarc(0, 0, inner, theta + span, theta, true);
+      shape.closePath();
+      group.add(slab(shape, height, mats[c]));
       inner += len;
     });
   });
   // Kreis um den Sockel als Bezug
-  const base = new THREE.Mesh(new THREE.RingGeometry(r0 - 1.5, r0, 96),
-    new THREE.MeshStandardMaterial({ color: 0x9fd6b3, roughness: 1, side: THREE.DoubleSide }));
-  base.rotation.x = -Math.PI / 2;
-  base.position.set(cx, bottom + 0.35, cz);
-  group.add(base);
+  const width = Math.max(1.5, state.radius * 0.006);
+  const circle = new THREE.Shape();
+  circle.absarc(0, 0, r0, 0, Math.PI * 2, false);
+  const hole = new THREE.Path();
+  hole.absarc(0, 0, r0 - width, 0, Math.PI * 2, true);
+  circle.holes.push(hole);
+  group.add(slab(circle, height * 0.6, new THREE.MeshStandardMaterial({ color: 0x9fd6b3, roughness: 1 })));
   return group;
 }
 

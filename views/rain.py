@@ -9,17 +9,20 @@ from modules.simulator import LC_BUILDING, LC_WATER
 from views.common import (GREY, ORANGE, RADIO_OPTIONS, building_tooltips, climate_info,
                           current_rain, legend_ramp, legend_swatches, num, page_header, rain_scenarios,
                           scene_for, show_scene)
-from views.common import RAIN_DURATION_NAME, card, kpi_row, odds_card, official_kostra
+from views.common import RAIN_DURATION_NAME, card, facts_html, kpi_row, odds_row, official_kostra
 import pandas as pd
 
 DISPLAYS = RADIO_OPTIONS["rain_display"]
 
 
 def _kostra_card(model):
-    odds_card(model, "rain", "Chance, dass mindestens diese Regenmenge in der gewählten Dauer fällt.")
+    """Amtliche Regenhöhen am Standort: 100-jährliche Werte groß, die ganze Tabelle aufklappbar."""
     table = official_kostra(model)
-    if table:
-        with st.expander("Amtliche Regenhöhen am Standort (KOSTRA-DWD-2020)"):
+    with card("mint"):
+        st.markdown("**Amtliche Starkregen-Statistik am Standort**")
+        st.html(facts_html([(f"{RAIN_DURATION_NAME.get(d, f'{d} min')} · alle 100 Jahre", f"{num(t[100])} l/m²", None)
+                            for d, t in table.items() if t.get(100)]))
+        with st.expander("Alle Regenhöhen (KOSTRA-DWD-2020)"):
             rows = {RAIN_DURATION_NAME.get(d, f"{d} min"): {f"alle {T} J.": v for T, v in t.items()}
                     for d, t in table.items()}
             st.dataframe(pd.DataFrame(rows).T, width="stretch")
@@ -36,6 +39,9 @@ def render():
     if st.session_state.rain_scenario not in scenarios:
         st.session_state.rain_scenario = "Jahrhundertregen (100 l/m²)"
     raster, b = model.raster, model.buildings
+
+    odds_row(model, "rain", "Chance, dass mindestens diese Regenmenge in der gewählten Dauer fällt.",
+             side=(lambda: _kostra_card(model)) if official_kostra(model) else None)
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:
@@ -60,7 +66,6 @@ def render():
                            "Tage pro Jahr mit mindestens 20 l/m².")
         result, _ = current_rain(model)
         k = result.kpis
-        _kostra_card(model)
         st.caption(f"Versiegelungsgrad des Gebiets: {k['sealed_share']:.0%}. Die Kanalisation nimmt "
                    f"{num(k['sewer_m3'])} m³ auf, {k['runoff_coeff']:.0%} des Regens fließen oberflächlich "
                    "ab. Dachwasser kommt über die Fallrohre neben dem Gebäude an.")
