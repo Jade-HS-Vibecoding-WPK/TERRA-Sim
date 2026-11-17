@@ -30,7 +30,7 @@ Angelehnt an Planungswerkzeuge wie Autodesk Forma beginnt jede Sitzung mit einem
 
 Die **Übersicht** ist ein Bento-Grid: Projektkarte, Klima-Steckbrief, Gebietskennzahlen (GRZ, GFZ, Versiegelung, Grünanteil), je Gefahr eine Kachel mit Ampel und der Frage „Wie oft?“, eine Rangliste „Wie wahrscheinlich ist was?“ und die Exporte (Projektdatei, Kennzahlen als CSV, alle Gebäude mit Ergebnissen als GeoJSON, z. B. für QGIS).
 
-**Design:** überwiegend Grüntöne; **Lila** steht für Warnungen, **Rot** für Gefahr, Schäden und Fehler – in Kacheln, Ampeln, Farbskalen und in der 3D-Ansicht. Wasser bleibt blau.
+**Design:** überwiegend Grüntöne; **Orange** steht für Warnungen, **Rot** für Gefahr, Schäden und Fehler – in Kacheln, Ampeln, Farbskalen und in der 3D-Ansicht. Wasser bleibt blau.
 
 ### 0. 🌦️ Klima am Standort (Meteostat)
 * Messdaten der nächstgelegenen Wetterstationen der letzten 10 Jahre (Wind: 3 Jahre stündlich).
@@ -59,7 +59,7 @@ Die **Übersicht** ist ein Bento-Grid: Projektkarte, Klima-Steckbrief, Gebietske
 * Geometrische Expositions- und Sichtlinienanalyse (Raycasting light) statt rechenintensiver CFD-Strömungsmechanik.
 * **Live-Auswertung:** Markierung ungeschützter, hochbelasteter Fassadenflächen sowie enger Straßenschluchten mit Düseneffekt (Venturi-Effekt).
 * **Luftströmung am Boden:** Strömungsfeld in 2 m Höhe aus Potentialströmung um die Gebäude (Beschleunigung an Ecken und in Lücken) und Windschatten hinter den Gebäuden. Als Heatmap „Wind in Fußgängerhöhe“ oder „Windschatten“, mit Kennzahlen (gefährlich windige Flächen ab 54 km/h, Anteil im Windschatten) und als **animierte Windteilchen**, die durch die Straßen und über die Dächer fließen. Der blaue Windpfeil lässt sich ausschalten.
-* **Woher der Wind wirklich kommt:** Aus zehn Jahren Stundenwerten der nächsten DWD-Station zeigt die Seite, wie oft der Wind aus der gewählten Richtung kommt und wie viele Stunden im Jahr er die gewählte Stärke erreicht. In der 3D-Ansicht liegt die gemessene **Windrose als Kranz um den Sockel**: je Richtung ein Balken, Länge = Häufigkeit, Farbe = Windstärke (grün ruhig, lila stark, rot Sturm).
+* **Woher der Wind wirklich kommt:** Aus zehn Jahren Stundenwerten der nächsten DWD-Station zeigt die Seite, wie oft der Wind aus der gewählten Richtung kommt und wie viele Stunden im Jahr er die gewählte Stärke erreicht. In der 3D-Ansicht liegt die gemessene **Windrose als Kranz um den Sockel**: je Richtung ein Balken, Länge = Häufigkeit, Farbe = Windstärke (grün ruhig, orange stark, rot Sturm).
 
 ### 5. 🫨 Modul D: Erdbeben
 * Magnitude, Entfernung zum Epizentrum und Untergrund wählen; Vorlagen von „spürbar“ bis „extrem“ (u. a. wie Roermond 1992).
@@ -81,7 +81,7 @@ Die **Übersicht** ist ein Bento-Grid: Projektkarte, Klima-Steckbrief, Gebietske
 * Ab 60 m Durchmesser wird ein UFO zum **Mutterschiff**: Es fliegt feste Haltepunkte an und saugt dort alle Gebäude ein, deren Mitte im Strahl liegt – sie schweben drehend nach oben und verschwinden im Schiff. Nach jeder Runde stehen sie wieder da; die Zahl der eingesaugten Gebäude steht in Seite und Übersicht.
 
 ### Wie wahrscheinlich ist ein Szenario? (amtliche Daten)
-Zu jeder Gefahr nennt TERRA-Sim, wie oft das eingestellte Szenario am Standort vorkommt – als **Wiederkehrzeit** („etwa alle 100 Jahre“) und als **Chance in 30 Jahren** (z. B. Nutzungsdauer eines Gebäudes). Die Übersicht sortiert alle Gefahren in der Karte „Wie wahrscheinlich ist was?“; Rot = häufig (bis alle 30 Jahre), Lila = bis alle 300 Jahre, Grün = seltener.
+Zu jeder Gefahr nennt TERRA-Sim, wie oft das eingestellte Szenario am Standort vorkommt – als **Wiederkehrzeit** („etwa alle 100 Jahre“) und als **Chance in 30 Jahren** (z. B. Nutzungsdauer eines Gebäudes). Die Übersicht sortiert alle Gefahren in der Karte „Wie wahrscheinlich ist was?“; Rot = häufig (bis alle 30 Jahre), Orange = bis alle 300 Jahre, Grün = seltener.
 
 | Gefahr | Amtliche Grundlage | So wird gerechnet |
 | :--- | :--- | :--- |

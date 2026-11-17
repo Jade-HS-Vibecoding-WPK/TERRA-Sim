@@ -1,4 +1,4 @@
-# Farbschema: überwiegend Grün; Rot und Lila nur für Risiken, Schäden und Fehler.
+# Farbschema: überwiegend Grün; Orange und Rot nur für Risiken, Schäden und Fehler.
 [theme]
 base = "light"
 primaryColor = "#1f7a4d"
@@ -11,7 +11,6 @@ baseRadius = "0.8rem"
 buttonRadius = "0.75rem"
 redColor = "#d33a3a"
 greenColor = "#2f9e5f"
-violetColor = "#7e3bb0"
 headingFontWeights = [800, 750, 700, 650, 600, 600]
 
 [theme.sidebar]

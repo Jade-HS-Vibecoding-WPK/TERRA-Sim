@@ -9,7 +9,7 @@
 //
 // VortexParticles: Staub und Trümmer, die um den Tornado-Trichter wirbeln.
 
-const RAMP = [[98, 184, 120], [196, 160, 230], [140, 70, 196], [200, 32, 52]];   // wie viewer_3d "wind"
+const RAMP = [[116, 196, 118], [255, 217, 79], [244, 109, 67], [165, 0, 38]];   // wie viewer_3d "wind"
 const rand = (a, b) => a + Math.random() * (b - a);
 
 async function decode(b64) {

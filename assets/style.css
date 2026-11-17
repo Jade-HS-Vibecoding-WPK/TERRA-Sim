@@ -2,7 +2,7 @@
    Wird in views/common.py per st.html eingebunden. Farben passend zu
    .streamlit/config.toml.
 
-   Grundregel: Grün = Normalzustand und Bedienung. Lila = Warnung,
+   Grundregel: Grün = Normalzustand und Bedienung. Orange = Warnung,
    Rot = Gefahr, Schaden, Fehler.
 
    Karten entstehen in Python über views.common.card(); Streamlit hängt den
@@ -24,9 +24,9 @@
   --muted: #557063;
   --card: #ffffff;
   --shadow: 0 1px 2px rgba(16, 41, 29, .05), 0 10px 28px rgba(16, 41, 29, .07);
-  --warn: #7e3bb0;        /* Lila: Warnung */
-  --warn-bg: #f3e9fb;
-  --warn-line: #dcc4f0;
+  --warn: #9a6400;        /* Orange/Bernstein: Warnung */
+  --warn-bg: #fff3d6;
+  --warn-line: #f3dca0;
   --risk: #d33a3a;        /* Rot: Gefahr */
   --risk-bg: #fdeaea;
   --risk-line: #f3c4c4;

@@ -23,7 +23,7 @@ REFERENCE_SHORT = {
 
 def _tile(title: str, scenario: str, value: str, sub: str, level: str, status: str, page_key: str,
           probability: str = ""):
-    """Bento-Kachel einer Analyse; Lila/Rot getönt, wenn es kritisch wird."""
+    """Bento-Kachel einer Analyse; Orange/Rot getönt, wenn es kritisch wird."""
     from views.navigation import PAGES
 
     with card(tone_of(level)):
@@ -120,7 +120,7 @@ def render():
     # ---- Reihe 3–5: Gefahren als Bento-Kacheln ------------------------------
     st.subheader("Gefahren")
     st.caption("Ergebnis mit den Einstellungen, die zuletzt in der jeweiligen Analyse gewählt wurden. "
-               "Grün = unkritisch, Lila = erhöhtes Risiko, Rot = hohes Risiko.")
+               "Grün = unkritisch, Orange = erhöhtes Risiko, Rot = hohes Risiko.")
     flood, base = current_flood(model)
     rain, rain_label = current_rain(model)
     wind, direction, beaufort = current_wind(model)
@@ -251,5 +251,5 @@ def _probability_card(model):
         st.caption("Chance, dass das eingestellte Szenario am Standort in den nächsten 30 Jahren mindestens "
                    "einmal eintritt – aus amtlichen Daten und Messreihen, bei Kaiju und Aliens aus "
                    "Modellrechnungen mit Fachliteratur. Rot = häufig (bis alle 30 Jahre), "
-                   "Lila = bis alle 300 Jahre, Grün = seltener.")
+                   "Orange = bis alle 300 Jahre, Grün = seltener.")
         st.html("".join(odds_bar(HAZARD_LABELS[key], o, src) for key, (o, src) in order))
