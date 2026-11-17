@@ -114,7 +114,9 @@ def sidebar():
         current = get_model()
         terrain = (current.dem.attribution or current.dem.source) if current else \
             "DGM1 der Länder / Open-Elevation / Open-Meteo"
-        st.caption(f"Daten: © OpenStreetMap-Mitwirkende · Gelände: {terrain} · Meteostat. "
+        st.caption(f"Daten: © OpenStreetMap-Mitwirkende · Gelände: {terrain} · Meteostat · "
+                   "Datenbasis: Deutscher Wetterdienst (KOSTRA-DWD-2020, Wind- und Böenmessungen) · "
+                   "Hochwassergefahrenkarten der Länder (BfG-Geoportal) · Erdbebenzonen: GFZ Potsdam. "
                    "Heuristische Ersteinschätzung, kein Gutachten.")
 
 

@@ -417,7 +417,7 @@ function makeNik(THREE) {
   const canvas = document.createElement('canvas');
   canvas.width = 256; canvas.height = 96;
   const g = canvas.getContext('2d');
-  g.fillStyle = 'rgba(11, 110, 116, 0.92)';
+  g.fillStyle = 'rgba(31, 122, 77, 0.95)';
   g.beginPath(); g.roundRect(8, 8, 240, 80, 40); g.fill();
   g.fillStyle = '#fff'; g.font = 'bold 54px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillText('Nik', 128, 50);

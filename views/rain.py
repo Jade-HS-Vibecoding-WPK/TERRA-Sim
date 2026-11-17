@@ -9,8 +9,22 @@ from modules.simulator import LC_BUILDING, LC_WATER
 from views.common import (GREY, ORANGE, RADIO_OPTIONS, building_tooltips, climate_info,
                           current_rain, legend_ramp, legend_swatches, num, page_header, rain_scenarios,
                           scene_for, show_scene)
+from views.common import RAIN_DURATION_NAME, card, kpi_row, odds_card, official_kostra
+import pandas as pd
 
 DISPLAYS = RADIO_OPTIONS["rain_display"]
+
+
+def _kostra_card(model):
+    odds_card(model, "rain", "Chance, dass mindestens diese Regenmenge in der gewählten Dauer fällt.")
+    table = official_kostra(model)
+    if table:
+        with st.expander("Amtliche Regenhöhen am Standort (KOSTRA-DWD-2020)"):
+            rows = {RAIN_DURATION_NAME.get(d, f"{d} min"): {f"alle {T} J.": v for T, v in t.items()}
+                    for d, t in table.items()}
+            st.dataframe(pd.DataFrame(rows).T, width="stretch")
+            st.caption("Regenhöhe in l/m², die im Mittel einmal in so vielen Jahren erreicht wird "
+                       "(5-km-Raster). Quelle: Deutscher Wetterdienst, KOSTRA-DWD-2020, CC BY 4.0.")
 
 
 def render():
@@ -25,9 +39,15 @@ def render():
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:
-        with st.container(border=True):
+        with card():
             st.markdown("**Szenario**")
             st.selectbox("Regenmenge", list(scenarios), key="rain_scenario")
+            fixed = "Stundenregen" in st.session_state.rain_scenario or "Tagesregen" in st.session_state.rain_scenario
+            st.radio("Regendauer", RADIO_OPTIONS["rain_duration"], key="rain_duration", horizontal=True,
+                     disabled=fixed,
+                     help="Wie lange es dauert, bis die Regenmenge gefallen ist. Entscheidet, wie selten der Regen "
+                          "ist (DWD KOSTRA) – die Wasserverteilung rechnet TERRA-Sim für das ganze Ereignis auf "
+                          "einmal. Amtliche und gemessene Szenarien haben eine feste Dauer.")
             st.slider("Kanalisation nimmt auf", 0, 60, step=5, format="%d l/m²", key="rain_sewer",
                       help="So viel Regen leiten Kanäle und Fallrohre von Dächern, Straßen und Plätzen ab. "
                            "Übliche Auslegung: Regen, wie er alle 2–5 Jahre vorkommt – etwa 15–25 l/m² "
@@ -40,6 +60,7 @@ def render():
                            "Tage pro Jahr mit mindestens 20 l/m².")
         result, _ = current_rain(model)
         k = result.kpis
+        _kostra_card(model)
         st.caption(f"Versiegelungsgrad des Gebiets: {k['sealed_share']:.0%}. Die Kanalisation nimmt "
                    f"{num(k['sewer_m3'])} m³ auf, {k['runoff_coeff']:.0%} des Regens fließen oberflächlich "
                    "ab. Dachwasser kommt über die Fallrohre neben dem Gebäude an.")
@@ -60,7 +81,7 @@ def render():
         legend = legend_ramp("heat", "erhöhter Abfluss", "Wasseransammlung", "Risiko")
 
     with right:
-        c = st.columns(4)
+        c = kpi_row(4)
         c[0].metric(f"Gebäude (von {k['buildings_total']})", num(k["buildings_affected"]),
                     help="Gebäude mit Rückstau-Risiko: Neben dem Gebäude stehen mindestens 10 cm Wasser "
                          "auf mindestens 25 m².")

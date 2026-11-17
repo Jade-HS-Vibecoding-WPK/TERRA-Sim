@@ -7,6 +7,7 @@ import streamlit as st
 from modules.hazards import MOTHERSHIP_SIZE_M
 from modules.viewer_webgpu import scene as vscene
 from views.common import GREY, current_alien, num, page_header, scene_for, scene_origin, show_scene
+from views.common import card, kpi_row, odds_card
 
 PRESETS = {"Erkundung · 1 kleines UFO": (1, 20, 50), "Invasion · 3 UFOs": (3, 30, 60),
            "Mutterschiff · 1 riesiges UFO": (1, 80, 120)}
@@ -30,11 +31,11 @@ def render():
 
     left, right = st.columns([1, 2.6], gap="large")
     with left:
-        with st.container(border=True):
+        with card():
             st.markdown("**Szenario**")
             for label, values in PRESETS.items():
                 st.button(label, key=f"alien_{label}", width="stretch", on_click=_apply, args=values)
-        with st.container(border=True):
+        with card():
             st.slider("Anzahl UFOs", 1, 5, key="alien_ufos")
             st.slider("Durchmesser", 10, 80, step=5, format="%d m", key="alien_size")
             st.slider("Flughöhe", 25, 150, step=5, format="%d m", key="alien_height")
@@ -53,8 +54,10 @@ def render():
         st.caption("Wer in der Nähe ist, rennt weg – wer im Strahl steht, schwebt nach oben; der Zähler unten "
                    "rechts in der 3D-Ansicht zählt mit. Mit „Nik folgen“ sieht man, ob Nik entkommt.")
 
+        odds_card(model, "fiction")
+
     with right:
-        c = st.columns(4)
+        c = kpi_row(4)
         c[0].metric("UFOs", num(ss.alien_ufos))
         c[1].metric("Strahl-Durchmesser", f"{num(beam)} m")
         c[2].metric(f"Gebäude eingesaugt (von {k['buildings_total']})", num(k["lifted"]) if k["mothership"] else "–",

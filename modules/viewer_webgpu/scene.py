@@ -41,12 +41,12 @@ POS_SCALE = 0.05  # Int16-Schritt in Metern: 5 cm Genauigkeit, ±1.600 m Reichwe
 
 # Farben der Kartengrundlage auf dem Gelände (hell, ruhig – wie ein Arbeitsmodell)
 MAP_COLORS = {
-    "ground": (233, 229, 219),
-    "green": (190, 214, 166),
+    "ground": (229, 236, 226),
+    "green": (176, 216, 168),
     "water": (150, 192, 224),
     "street": (204, 202, 198),
     "path": (221, 216, 206),
-    "footprint": (214, 208, 198),
+    "footprint": (212, 220, 210),
 }
 
 
@@ -346,3 +346,20 @@ def hazard(kind: str, **values) -> dict:
 def water(level_rel: float) -> dict:
     """Wasserspiegel (Hochwasser) in Höhe ``level_rel`` über dem Nullpunkt."""
     return {"level": float(level_rel)}
+
+
+def windrose(rose, colors: list, label: str = "") -> dict | None:
+    """Windrose aus Messdaten als Kranz um den Geländesockel.
+
+    ``rose``    Tabelle aus ``climate_loader.wind_rose`` (Richtung, Winkel, Klasse, Anteil in %)
+    ``colors``  eine RGB-Farbe je Windstärke-Klasse (schwach -> stark)
+    Je Richtung (woher der Wind kommt) ein gestapelter Balken nach außen.
+    """
+    if rose is None or len(rose) == 0:
+        return None
+    classes = list(dict.fromkeys(rose["Klasse"]))
+    table = rose.pivot_table(index="Winkel", columns="Klasse", values="Anteil", aggfunc="sum")
+    table = table.reindex(columns=classes).fillna(0.0).sort_index()
+    return {"angles": [float(a) for a in table.index], "shares": np.round(table.to_numpy(), 3).tolist(),
+            "classes": classes, "colors": [[int(c) for c in col] for col in colors[:len(classes)]],
+            "label": label}

@@ -1,73 +1,161 @@
-/* TERRA-Sim – zusätzliches Styling für die Streamlit-Oberfläche.
+/* TERRA-Sim – Bento-Grid-Design
    Wird in views/common.py per st.html eingebunden. Farben passend zu
-   .streamlit/config.toml (Primärfarbe #0b6e74). */
+   .streamlit/config.toml.
+
+   Grundregel: Grün = Normalzustand und Bedienung. Lila = Warnung,
+   Rot = Gefahr, Schaden, Fehler.
+
+   Karten entstehen in Python über views.common.card(); Streamlit hängt den
+   Schlüssel als CSS-Klasse an (st-key-card-TON-NR), darüber werden sie hier
+   gestaltet. */
 
 :root {
-  --terra-primary: #0b6e74;
-  --terra-primary-soft: #e3f3f2;
-  --terra-text: #0f2b2e;
-  --terra-muted: #5b6b6d;
-  --terra-border: #d9e2e2;
-  --terra-ok: #2e7d32;
-  --terra-ok-bg: #e7f4e8;
-  --terra-warn: #9a6400;
-  --terra-warn-bg: #fff3d6;
-  --terra-risk: #b3261e;
-  --terra-risk-bg: #fde7e5;
+  --g-950: #0b2318;
+  --g-900: #10291d;
+  --g-800: #14532d;
+  --g-700: #1b6b42;
+  --g-600: #1f7a4d;
+  --g-500: #2f9e5f;
+  --g-300: #9fd6b3;
+  --g-200: #c8eacf;
+  --g-100: #e2f3e6;
+  --g-50:  #f1f8f3;
+  --line: #d4e8da;
+  --muted: #557063;
+  --card: #ffffff;
+  --shadow: 0 1px 2px rgba(16, 41, 29, .05), 0 10px 28px rgba(16, 41, 29, .07);
+  --warn: #7e3bb0;        /* Lila: Warnung */
+  --warn-bg: #f3e9fb;
+  --warn-line: #dcc4f0;
+  --risk: #d33a3a;        /* Rot: Gefahr */
+  --risk-bg: #fdeaea;
+  --risk-line: #f3c4c4;
+  --radius: 22px;
 }
 
-/* Etwas mehr Platz für die 3D-Ansicht */
-.block-container { padding-top: 2.2rem; padding-bottom: 2rem; max-width: 1500px; }
+/* ---------------------------------------------------------------- Grundfläche */
+.stApp {
+  background:
+    radial-gradient(1100px 520px at -5% -10%, #dcf0e2 0%, transparent 60%),
+    radial-gradient(900px 480px at 105% 0%, #e6f5e9 0%, transparent 55%),
+    var(--g-50);
+}
+.block-container { padding-top: 1.6rem; padding-bottom: 2.5rem; max-width: 1560px; }
+h1, h2, h3 { color: var(--g-900); letter-spacing: -0.01em; }
+h3 { font-size: 1.15rem !important; }
 
-/* Kopfzeile jeder Seite: Projekt › Ansicht */
-.terra-crumb { color: var(--terra-muted); font-size: 0.85rem; margin-bottom: -0.4rem; }
-.terra-crumb b { color: var(--terra-primary); font-weight: 600; }
+/* ---------------------------------------------------------------- Bento-Karten */
+[class*="st-key-card-"] {
+  background: var(--card);
+  border: 1px solid var(--line) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow);
+  padding: 1.05rem 1.15rem 1.1rem !important;
+}
+[class*="st-key-card-mint-"] { background: linear-gradient(160deg, #f4fbf6 0%, var(--g-100) 100%); }
+[class*="st-key-card-dark-"] {
+  background: radial-gradient(500px 260px at 100% 0%, rgba(159, 214, 179, .25), transparent 60%),
+              linear-gradient(140deg, var(--g-800) 0%, var(--g-600) 100%);
+  border-color: transparent !important;
+}
+[class*="st-key-card-dark-"] * { color: #ecfbf1 !important; }
+[class*="st-key-card-dark-"] [data-testid="stMetricLabel"] * { color: #b9e6c8 !important; }
+[class*="st-key-card-warn-"] { background: linear-gradient(160deg, #fff 0%, var(--warn-bg) 100%);
+  border-color: var(--warn-line) !important; }
+[class*="st-key-card-risk-"] { background: linear-gradient(160deg, #fff 0%, var(--risk-bg) 100%);
+  border-color: var(--risk-line) !important; }
 
-/* Schrittanzeige auf der Projekt-Seite */
-.terra-steps { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.3rem 0 1rem; }
-.terra-step { display: flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.8rem;
-  border-radius: 999px; border: 1px solid var(--terra-border); color: var(--terra-muted);
-  font-size: 0.88rem; background: #fff; }
+/* Kennzahl-Kacheln (views.common.kpi_row) */
+[class*="st-key-kpis-"] [data-testid="stMetric"] {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: .7rem .95rem .75rem;
+  height: 100%;
+}
+[data-testid="stMetricLabel"] { color: var(--muted); }
+[data-testid="stMetricValue"] { color: var(--g-900); font-weight: 750; }
+
+/* 3D-Ansicht als große Bento-Kachel */
+iframe[title*="terra_viewer"] { border-radius: var(--radius); box-shadow: var(--shadow); }
+
+/* Diagramme, Tabellen und Expander rund */
+[data-testid="stExpander"] details { border-radius: 18px; border-color: var(--line); background: #fff; }
+[data-testid="stDataFrame"] { border-radius: 14px; overflow: hidden; }
+
+/* ---------------------------------------------------------------- Kopfbereich jeder Seite */
+.terra-hero {
+  border-radius: var(--radius);
+  padding: 1.15rem 1.4rem 1.2rem;
+  margin: 0 0 .35rem;
+  color: #fff;
+  background: radial-gradient(700px 300px at 100% -20%, rgba(159, 214, 179, .35), transparent 65%),
+              linear-gradient(130deg, var(--g-800) 0%, var(--g-600) 70%, var(--g-500) 100%);
+  box-shadow: var(--shadow);
+}
+.terra-hero .crumb { font-size: .82rem; color: #bfe8cc; margin-bottom: .15rem; }
+.terra-hero .crumb b { color: #fff; }
+.terra-hero h1 { color: #fff !important; font-size: 2.1rem; margin: 0; padding: 0; line-height: 1.15; }
+.terra-hero p { color: #d8f3e1; margin: .35rem 0 0; font-size: .95rem; max-width: 980px; }
+
+/* ---------------------------------------------------------------- Schrittanzeige (Projekt anlegen) */
+.terra-steps { display: flex; gap: .5rem; flex-wrap: wrap; margin: .3rem 0 .9rem; }
+.terra-step { display: flex; align-items: center; gap: .45rem; padding: .35rem .85rem;
+  border-radius: 999px; border: 1px solid var(--line); color: var(--muted);
+  font-size: .88rem; background: #fff; }
 .terra-step .num { display: inline-flex; width: 1.35rem; height: 1.35rem; border-radius: 50%;
-  align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700;
-  background: var(--terra-border); color: var(--terra-text); }
-.terra-step.active { border-color: var(--terra-primary); color: var(--terra-text); font-weight: 600; }
-.terra-step.active .num { background: var(--terra-primary); color: #fff; }
-.terra-step.done .num { background: var(--terra-ok); color: #fff; }
+  align-items: center; justify-content: center; font-size: .78rem; font-weight: 700;
+  background: var(--g-100); color: var(--g-900); }
+.terra-step.active { border-color: var(--g-600); color: var(--g-900); font-weight: 600; }
+.terra-step.active .num { background: var(--g-600); color: #fff; }
+.terra-step.done .num { background: var(--g-500); color: #fff; }
 
-/* Navigation in der Seitenleiste */
-.terra-nav-title { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.72rem;
-  color: var(--terra-muted); margin: 0.9rem 0 0.1rem; font-weight: 600; }
-.terra-locked-hint { font-size: 0.8rem; color: var(--terra-muted); margin: 0.2rem 0 0.4rem; }
+/* ---------------------------------------------------------------- Seitenleiste */
+.terra-nav-title { text-transform: uppercase; letter-spacing: .07em; font-size: .7rem;
+  color: var(--g-700); margin: .9rem 0 .1rem; font-weight: 700; }
+.terra-locked-hint { font-size: .8rem; color: var(--muted); margin: .2rem 0 .4rem; }
+.terra-project { border-radius: 18px; padding: .7rem .85rem; margin-bottom: .45rem; color: #fff;
+  background: linear-gradient(140deg, var(--g-800), var(--g-600)); box-shadow: var(--shadow); }
+.terra-project .name { font-weight: 750; color: #fff; }
+.terra-project .meta { font-size: .78rem; color: #c9efd6; line-height: 1.4; }
+[data-testid="stSidebar"] a[data-testid="stPageLink-NavLink"] { border-radius: 12px; }
+[data-testid="stSidebar"] a[data-testid="stPageLink-NavLink"]:hover { background: var(--g-200); }
 
-/* Projektkarte in der Seitenleiste */
-.terra-project { border: 1px solid var(--terra-border); border-radius: 10px; padding: 0.6rem 0.75rem;
-  background: #fff; margin-bottom: 0.4rem; }
-.terra-project .name { font-weight: 700; color: var(--terra-text); }
-.terra-project .meta { font-size: 0.8rem; color: var(--terra-muted); line-height: 1.35; }
+/* ---------------------------------------------------------------- Status-Plaketten (Ampel) */
+.terra-pill { display: inline-block; padding: .14rem .62rem; border-radius: 999px;
+  font-size: .76rem; font-weight: 700; white-space: nowrap; }
+.terra-pill.ok { background: var(--g-100); color: var(--g-700); }
+.terra-pill.warn { background: var(--warn-bg); color: var(--warn); }
+.terra-pill.risk { background: var(--risk-bg); color: var(--risk); }
+.terra-pill.none { background: #eef4f0; color: var(--muted); }
 
-/* Statusanzeige (Ampel) für Analysen */
-.terra-pill { display: inline-block; padding: 0.12rem 0.6rem; border-radius: 999px;
-  font-size: 0.78rem; font-weight: 600; }
-.terra-pill.ok { background: var(--terra-ok-bg); color: var(--terra-ok); }
-.terra-pill.warn { background: var(--terra-warn-bg); color: var(--terra-warn); }
-.terra-pill.risk { background: var(--terra-risk-bg); color: var(--terra-risk); }
-.terra-pill.none { background: #eef1f1; color: var(--terra-muted); }
+/* ---------------------------------------------------------------- Analyse-Kacheln (Übersicht) */
+.terra-tile-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.terra-tile-title { font-size: 1.05rem; font-weight: 750; color: var(--g-900); }
+.terra-tile-scenario { color: var(--muted); font-size: .83rem; margin: .15rem 0 .45rem; }
+.terra-tile-value { font-size: 1.55rem; font-weight: 800; color: var(--g-900); line-height: 1.2; }
+.terra-tile-sub { color: var(--muted); font-size: .83rem; }
+.terra-tile-prob { margin-top: .55rem; font-size: .8rem; color: var(--muted); }
+.terra-tile-prob b { color: var(--g-900); }
 
-/* Analyse-Kacheln auf der Übersicht */
-.terra-tile-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
-.terra-tile-title { font-size: 1.05rem; font-weight: 700; color: var(--terra-text); }
-.terra-tile-scenario { color: var(--terra-muted); font-size: 0.84rem; margin: 0.15rem 0 0.4rem; }
-.terra-tile-value { font-size: 1.6rem; font-weight: 700; color: var(--terra-text); line-height: 1.2; }
-.terra-tile-sub { color: var(--terra-muted); font-size: 0.84rem; }
+/* Wahrscheinlichkeits-Balken */
+.terra-prob { display: grid; grid-template-columns: 1fr auto; gap: .2rem .6rem; align-items: center;
+  font-size: .84rem; margin: .25rem 0; }
+.terra-prob .bar { grid-column: 1 / -1; height: .5rem; border-radius: 999px; background: var(--g-100);
+  overflow: hidden; }
+.terra-prob .bar span { display: block; height: 100%; border-radius: 999px; }
+.terra-prob .label { color: var(--g-900); font-weight: 600; }
+.terra-prob .value { color: var(--muted); font-variant-numeric: tabular-nums; }
 
-/* Legenden unter der 3D-Ansicht */
-.terra-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1.1rem;
-  font-size: 0.82rem; color: var(--terra-muted); margin-top: 0.35rem; }
-.terra-legend .swatch { display: inline-block; width: 0.85rem; height: 0.85rem; border-radius: 3px;
-  margin-right: 0.35rem; vertical-align: -0.12rem; border: 1px solid rgba(0,0,0,0.12); }
-.terra-legend .ramp { display: inline-block; width: 150px; height: 0.7rem; border-radius: 3px;
-  vertical-align: -0.08rem; margin: 0 0.4rem; border: 1px solid rgba(0,0,0,0.12); }
+/* ---------------------------------------------------------------- Legenden unter der 3D-Ansicht */
+.terra-legend { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1.1rem;
+  font-size: .82rem; color: var(--muted); margin-top: .45rem; }
+.terra-legend .swatch { display: inline-block; width: .85rem; height: .85rem; border-radius: 4px;
+  margin-right: .35rem; vertical-align: -.12rem; border: 1px solid rgba(0, 0, 0, .1); }
+.terra-legend .ramp { display: inline-block; width: 150px; height: .7rem; border-radius: 999px;
+  vertical-align: -.08rem; margin: 0 .4rem; border: 1px solid rgba(0, 0, 0, .08); }
 
 /* Quellenangaben */
-.terra-source { font-size: 0.78rem; color: var(--terra-muted); }
+.terra-source { font-size: .78rem; color: var(--muted); }
+.terra-source a { color: var(--g-600); }

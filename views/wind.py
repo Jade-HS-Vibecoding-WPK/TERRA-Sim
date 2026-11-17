@@ -14,6 +14,7 @@ from modules.viewer_webgpu import scene as vscene
 from views.common import (GREY, RADIO_OPTIONS, current_wind, current_wind_field, legend_ramp,
                           legend_swatches, no_buildings, num, page_header, scene_for, scene_origin,
                           show_scene, wind_direction_label, wind_presets)
+from views.common import card, kpi_row, measured_direction_stats, measured_wind, odds_card
 
 VENTURI_COLOR = (214, 39, 180)
 
@@ -50,6 +51,43 @@ def _venturi_layer(venturi, ground, origin, raster):
     return vscene.paths(lines, VENTURI_COLOR, tips, radius_m=1.2)
 
 
+def _measured_wind_card(model, direction: int, beaufort: int):
+    """Woher kommt der Wind am Standort wirklich? (Stundenwerte der nächsten DWD-Station)"""
+    stats = measured_direction_stats(model, direction, beaufort)
+    with card("mint"):
+        st.markdown("**Woher der Wind wirklich kommt**")
+        st.toggle("Windrose aus Messdaten im 3D-Modell", key="wind_rose",
+                  help="Kranz um den Sockel: je Richtung, aus der der Wind kommt, ein Balken – Länge = "
+                       "Häufigkeit, Farbe = Windstärke (grün ruhig, lila stark, rot Sturm).")
+        if not stats:
+            st.caption("Für diesen Standort gibt es keine stündlichen Windmessungen.")
+            return
+        c = st.columns(2)
+        c[0].metric(f"Wind aus {stats['sector']}", f"{num(stats['share_from_dir'], 1)} %",
+                    help="Anteil aller Stunden mit Wind, in denen er aus dieser Richtung (± 11°) kommt")
+        c[1].metric(f"Bft {beaufort} oder mehr", f"{num(stats['strong_hours_per_year'])} h/Jahr",
+                    help="Stunden pro Jahr, in denen schon das Stundenmittel diese Stärke erreicht (aus allen "
+                         "Richtungen). Böen sind kurzzeitig deutlich stärker – die Sturm-Wahrscheinlichkeit oben "
+                         "rechnet deshalb mit den gemessenen Spitzenböen.")
+        if beaufort > 0:
+            st.caption(f"Davon aus {stats['sector']}: {num(stats['strong_from_dir_hours_per_year'], 1)} Stunden pro "
+                       f"Jahr ({num(stats['share_strong_from_dir'])} % der Starkwind-Stunden). Stärkstes "
+                       f"Stundenmittel im Messzeitraum: {num(stats['max_kmh'])} km/h. "
+                       f"Quelle: {stats['source']}, {num(stats['years'], 1)} Jahre Stundenwerte.")
+
+
+def _rose_layer(model):
+    if not st.session_state.get("wind_rose", True):
+        return None
+    hourly, source = measured_wind(model)
+    if hourly is None or hourly.empty:
+        return None
+    from modules.climate_loader import wind_rose
+    from views.climate import ROSE_COLORS
+    colors = [tuple(int(h[i:i + 2], 16) for i in (1, 3, 5)) for h in ROSE_COLORS]
+    return vscene.windrose(wind_rose(hourly), colors, source)
+
+
 def _apply_preset(direction: int, beaufort: int):
     st.session_state.wind_dir = int(round(direction / 5) * 5) % 360
     st.session_state.wind_bft = beaufort
@@ -67,7 +105,7 @@ def render():
     with left:
         presets = wind_presets(model)
         if presets:
-            with st.container(border=True):
+            with card():
                 st.markdown("**Szenario aus Messdaten**")
                 for label, (direction, beaufort) in presets.items():
                     st.button(f"{label} · Bft {beaufort}", key=f"preset_{label}", width="stretch",
@@ -75,7 +113,7 @@ def render():
                 st.caption("„Typisch“ = an 2 % der Stunden überschritten, „Gemessenes Maximum“ = stärkstes "
                            "Stundenmittel. Richtung: häufigste bei starkem Wind am Standort, "
                            f"{wind_direction_label(next(iter(presets.values()))[0])}.")
-        with st.container(border=True):
+        with card():
             st.markdown("**Szenario**")
             st.slider("Windrichtung (woher der Wind kommt)", 0, 355, step=5, format="%d°", key="wind_dir")
             st.slider("Windstärke (Beaufort)", 0, 12, key="wind_bft")
@@ -85,9 +123,12 @@ def render():
             k = result.kpis
             st.caption(f"Wind aus **{wind_direction_label(direction)}** · **{BEAUFORT_NAMES[beaufort]}**, "
                        f"ca. {num(k['speed_kmh'])} km/h in 10 m Höhe")
+        odds_card(model, "wind", "Chance, dass ein Sturm dieser Stärke aus dieser Richtung kommt "
+                                 "(Böen-Messreihe und gemessene Windrichtungen).")
+        _measured_wind_card(model, direction, beaufort)
         field = current_wind_field(model)
         fk = field.kpis
-        with st.container(border=True):
+        with card():
             st.markdown("**Am Boden (2 m Höhe)**")
             st.radio("Heatmap", RADIO_OPTIONS["wind_ground"], key="wind_ground", horizontal=True)
             st.toggle("Luftströmung animieren", key="wind_flow",
@@ -105,7 +146,7 @@ def render():
                        "diesen Wind.")
     with right:
         share = k["facade_area_high_m2"] / k["facade_area_total_m2"] if k["facade_area_total_m2"] else 0
-        c = st.columns(4)
+        c = kpi_row(4)
         c[0].metric("Fassade frei im Wind", f"{num(k['facade_area_high_m2'])} m²",
                     help=f"{share:.0%} der Fassadenfläche stehen nahezu ungeschützt und frontal im Wind "
                          "(Exposition ≥ 60 %). Wie stark sie belastet werden, zeigt der Winddruck.")
@@ -138,7 +179,7 @@ def render():
         scene = scene_for(model, colors=np.tile(np.array(GREY, float), (len(b), 1)), facades=facades,
                           paths=venturi,
                           arrow=vscene.wind_arrow(direction, top + 15) if st.session_state.wind_arrow else None,
-                          overlay=overlay, ramp=ramp, flow=flow,
+                          overlay=overlay, ramp=ramp, flow=flow, windrose=_rose_layer(model),
                           hazard=vscene.hazard("wind", bft=beaufort, from_deg=direction))
         show_scene(scene, key="scene_wind", height=640)
         if ground_mode == "Wind in Fußgängerhöhe":
