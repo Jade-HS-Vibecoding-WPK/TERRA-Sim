@@ -8,6 +8,8 @@
 ![GIS](https://img.shields.io/badge/Data-OpenStreetMap%20%7C%20SRTM-green)
 ![AI-Assisted](https://img.shields.io/badge/Built%20with-Claude%20Pro%20%2F%20Code-purple)
 
+**▶ Live-Demo: [jade-hs-vibecoding-wpk.github.io/TERRA-Sim](https://jade-hs-vibecoding-wpk.github.io/TERRA-Sim/)** – ein fertig berechnetes Beispielgebiet (Jade Hochschule Wilhelmshaven) mit 3D-Ansicht, allen Gefahren und ihren Wahrscheinlichkeiten, direkt im Browser.
+
 ---
 
 ## 🎯 Über das Projekt
@@ -152,7 +154,11 @@ terra-sim/
 │   ├── flood.py · rain.py · wind.py   # Wetter & Wasser
 │   └── earthquake.py · tornado.py · kaiju.py · alien.py   # weitere Katastrophen
 │
-└── assets/                    # Logo, Icon und CSS-Styling
+├── assets/                    # Logo, Icon und CSS-Styling
+├── demo/                      # 🌐 Live-Demo für GitHub Pages (index.html, demo.js, demo.css, data/)
+└── scripts/
+    ├── build_demo.py          # rechnet das Demo-Gebiet mit dem echten Code durch → demo/data/
+    └── assemble_demo.sh       # baut demo/ + 3D-Viewer zur statischen Seite zusammen
 ```
 
 ---
@@ -185,6 +191,29 @@ Seitenleiste zwischen Übersicht, Klima, 3D-Modell und den Analysen wechseln.
 > Ein Neuladen der Browserseite beendet die Sitzung. Mit **Speichern** in der
 > Seitenleiste lässt sich das Projekt als Datei sichern und später über den
 > Reiter **Projektdatei** wieder öffnen.
+
+### Live-Demo auf GitHub Pages
+
+GitHub Pages liefert nur statische Dateien aus, TERRA-Sim braucht aber Python.
+Die [Live-Demo](https://jade-hs-vibecoding-wpk.github.io/TERRA-Sim/) ist deshalb
+**vorberechnet**: `scripts/build_demo.py` lässt jede Analyseseite einmal mit den
+Standard-Einstellungen laufen (über Streamlits `AppTest`, also mit genau dem Code
+der App) und speichert, was sie anzeigt – die Szene für den 3D-Viewer, die
+Kennzahlen, Legenden und Wahrscheinlichkeiten. Die Seite in `demo/` schickt die
+Szene an denselben Viewer wie die App (`modules/viewer_webgpu/frontend`).
+
+```bash
+# Demo-Daten neu rechnen (Standard: Jade Hochschule Wilhelmshaven, 600 m)
+python scripts/build_demo.py
+python scripts/build_demo.py --name "Oldenburg Innenstadt" --lat 53.1405 --lon 8.2146 --side 600
+
+# lokal ansehen
+sh scripts/assemble_demo.sh .cache/site
+python -m http.server 8510 --directory .cache/site
+```
+
+Nach einem Push auf `main` veröffentlicht der Workflow
+`.github/workflows/pages.yml` die Demo automatisch.
 
 ---
 
