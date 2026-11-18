@@ -8,11 +8,15 @@
 # app.py, assets/, das Farbschema und der 3D-Viewer liegen als Dateien daneben, weil
 # Streamlit sie zur Laufzeit von der Festplatte liest.
 
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metadata
 
 ROOT = Path(SPECPATH).parent
+# Ohne diese Zeile findet collect_submodules die eigenen Pakete views/ und modules/ nur, wenn
+# PyInstaller zufällig aus dem Projektordner heraus gestartet wird (python -m PyInstaller).
+sys.path.insert(0, str(ROOT))
 
 datas, binaries, hiddenimports = [], [], []
 # Pakete mit Dateien neben dem Code (Weboberfläche, Vorlagen, Kartenanbieter, Schriften …)
@@ -30,7 +34,10 @@ for dist in ("streamlit", "streamlit-folium", "folium", "pydeck", "plotly", "met
         datas += copy_metadata(dist)
     except Exception:
         pass
-hiddenimports += collect_submodules("views") + collect_submodules("modules")
+own = collect_submodules("views") + collect_submodules("modules")
+if not {"views.navigation", "modules.methods"} <= set(own):
+    raise SystemExit(f"views/ und modules/ nicht gefunden – nur {own}")
+hiddenimports += own
 
 datas += [
     (str(ROOT / "app.py"), "."),
