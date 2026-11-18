@@ -88,6 +88,25 @@ jobs:
           & $iscc "/DAppVersion=$env:VERSION" desktop\installer.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Installer testen (langer Zielordner)
+        shell: pwsh
+        run: |
+          # Zielordner mit 140 Zeichen: Alle Pfade im Programm müssen trotzdem unter der
+          # Windows-Grenze von 260 Zeichen bleiben (sonst bricht der Installer ab).
+          $prefix = Join-Path $env:RUNNER_TEMP "installtest"
+          $target = Join-Path (Join-Path $prefix ("x" * (140 - $prefix.Length - 11))) "TERRA-Sim"
+          "Zielordner: $($target.Length) Zeichen"
+          $setup = (Get-ChildItem dist\TERRA-Sim-*-Setup.exe | Select-Object -First 1).FullName
+          $log = Join-Path $env:RUNNER_TEMP "install.log"
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", '/TASKS=""', "/DIR=`"$target`"", "/LOG=`"$log`"" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content $log -Tail 25; Write-Error "Installation fehlgeschlagen (Code $($p.ExitCode))"; exit 1 }
+          $report = Join-Path $env:RUNNER_TEMP "selftest-installiert.txt"
+          $t = Start-Process "$target\TERRA-Sim.exe" -ArgumentList "--selftest", "`"$report`"" -Wait -PassThru
+          Get-Content $report
+          $u = Start-Process "$target\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
+          if ($t.ExitCode -ne 0) { Write-Error "Selbsttest im installierten Programm fehlgeschlagen"; exit 1 }
+          if ($u.ExitCode -ne 0) { Write-Error "Deinstallation fehlgeschlagen"; exit 1 }
+
       - uses: actions/upload-artifact@v4
         with:
           name: TERRA-Sim-${{ env.VERSION }}-Windows

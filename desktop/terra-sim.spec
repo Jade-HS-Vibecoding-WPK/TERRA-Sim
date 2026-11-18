@@ -34,6 +34,12 @@ for dist in ("streamlit", "streamlit-folium", "folium", "pydeck", "plotly", "met
         datas += copy_metadata(dist)
     except Exception:
         pass
+# Nicht ins Programm: Streamlits Vorlagen für KI-Assistenten (.agents/) – zur Laufzeit unnötig und mit
+# bis zu 127 Zeichen so tief verschachtelt, dass der Installer in längeren Zielordnern an der
+# Windows-Pfadgrenze (260 Zeichen) scheitert.
+SKIP_PARTS = {".agents"}
+datas = [(src, dest) for src, dest in datas if not SKIP_PARTS & set(Path(dest).parts)]
+
 own = collect_submodules("views") + collect_submodules("modules")
 if not {"views.navigation", "modules.methods"} <= set(own):
     raise SystemExit(f"views/ und modules/ nicht gefunden – nur {own}")
@@ -68,3 +74,12 @@ exe = EXE(
     upx=False,
 )
 coll = COLLECT(exe, a.binaries, a.datas, name="TERRA-Sim", upx=False)
+
+# Pfadlängen begrenzen: Mit höchstens 110 Zeichen unter dem Programmordner bleibt für den
+# Installationsort (z. B. C:\Users\<Name>\AppData\Local\Programs\TERRA-Sim) genug Luft bis 260.
+MAX_RELATIVE_PATH = 110
+longest = max((len("_internal/" + name) for name, *_ in [*a.datas, *a.binaries]), default=0)
+if longest > MAX_RELATIVE_PATH:
+    worst = max((name for name, *_ in [*a.datas, *a.binaries]), key=len)
+    raise SystemExit(f"Pfad zu lang ({longest} Zeichen): _internal/{worst}")
+print(f"Längster Pfad im Programm: {longest} Zeichen (Grenze {MAX_RELATIVE_PATH})")
