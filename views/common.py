@@ -454,12 +454,15 @@ def warm_official_data(model: Model):
 @st.cache_data(show_spinner=False, max_entries=8)
 def _flood_impact(model_key: str, _model: Model, _floods: dict) -> dict:
     from pyproj import Transformer
-    from shapely.ops import transform
-    project = Transformer.from_crs("EPSG:25832", _model.crs, always_xy=True).transform
+    transformer = Transformer.from_crs("EPSG:25832", _model.crs, always_xy=True)
+
+    def project(xy: np.ndarray) -> np.ndarray:
+        return np.column_stack(transformer.transform(xy[:, 0], xy[:, 1]))
+
     geoms = np.asarray(_model.buildings.geometry.values)
     out = {}
     for key, scenario in _floods.items():
-        area = transform(project, scenario["geometry"])
+        area = shapely.transform(scenario["geometry"], project)
         hit = shapely.intersects(geoms, area) if len(geoms) else np.zeros(0, bool)
         out[key] = {**{k: v for k, v in scenario.items() if k != "geometry"}, "geometry_model": area,
                     "buildings": int(hit.sum()), "hit": hit}

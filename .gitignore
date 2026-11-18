@@ -22,3 +22,4 @@ Thumbs.db
 
 # Live-Demo (lokal zusammengebaut)
 _site/
+.pytest_cache/
