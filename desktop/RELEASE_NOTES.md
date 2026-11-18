@@ -1,4 +1,12 @@
-## TERRA-Sim 1.0 – Terrain, Environment & Resilience Simulator
+## TERRA-Sim 1.0.1 – Terrain, Environment & Resilience Simulator
+
+### Neu in 1.0.1
+
+- **Installer in langen Zielordnern:** Der Installer von 1.0 brach in sehr tief verschachtelten Ordnern ab, ebenso das Entpacken der ZIP. Ursache war die Windows-Grenze von 260 Zeichen pro Pfad.
+  - Streamlits Vorlagen für KI-Assistenten waren mit im Programm, zur Laufzeit unnötig und bis zu 127 Zeichen tief verschachtelt. Sie sind jetzt nicht mehr enthalten, der längste Pfad sinkt auf 89 Zeichen.
+  - Der Bauplan bricht ab, falls ein Pfad länger als 110 Zeichen würde.
+- **Prüfung beim Bauen:** Der Release-Workflow installiert das Programm jetzt testweise in einen Ordner mit 140 Zeichen, prüft es dort und deinstalliert es wieder.
+
 
 3D-Stadtmodell aus offenen Daten und Katastrophen-Analysen mit amtlichen Wahrscheinlichkeiten – jetzt auch als Programm für Windows.
 
@@ -6,8 +14,8 @@
 
 | Datei | Für wen |
 | :--- | :--- |
-| **TERRA-Sim-1.0-Setup.exe** | Installer für Windows 10/11 (64 Bit), ohne Administratorrechte. Legt TERRA-Sim im Startmenü an, auf Wunsch auch auf dem Desktop. |
-| **TERRA-Sim-1.0-Windows-portabel.zip** | Ohne Installation: entpacken und `TERRA-Sim.exe` starten, z. B. vom USB-Stick. |
+| **TERRA-Sim-1.0.1-Setup.exe** | Installer für Windows 10/11 (64 Bit), ohne Administratorrechte. Legt TERRA-Sim im Startmenü an, auf Wunsch auch auf dem Desktop. |
+| **TERRA-Sim-1.0.1-Windows-portabel.zip** | Ohne Installation: entpacken und `TERRA-Sim.exe` starten, z. B. vom USB-Stick. |
 
 **Beim ersten Start:**
 - Das Programm ist nicht signiert, deshalb zeigt Windows SmartScreen eventuell eine Warnung. Starten über **Weitere Informationen → Trotzdem ausführen**.
