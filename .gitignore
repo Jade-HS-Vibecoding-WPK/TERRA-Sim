@@ -23,3 +23,9 @@ Thumbs.db
 # Live-Demo (lokal zusammengebaut)
 _site/
 .pytest_cache/
+
+# Desktop-App (Build-Ergebnisse)
+build/
+dist/
+desktop/icon.ico
+desktop/icon.png

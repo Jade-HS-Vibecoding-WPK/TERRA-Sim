@@ -10,6 +10,23 @@
 
 **▶ Live-Demo: [jade-hs-vibecoding-wpk.github.io/TERRA-Sim](https://jade-hs-vibecoding-wpk.github.io/TERRA-Sim/)** – ein fertig berechnetes Beispielgebiet (Jade Hochschule Wilhelmshaven) mit 3D-Ansicht, allen Gefahren und ihren Wahrscheinlichkeiten, direkt im Browser.
 
+**⬇ Desktop-App für Windows: [Releases](https://github.com/Jade-HS-Vibecoding-WPK/TERRA-Sim/releases/latest)** – Installer oder portable ZIP, ohne Python.
+
+## 📥 Drei Wege zu TERRA-Sim
+
+| Weg | Für wen | So geht's |
+| :--- | :--- | :--- |
+| **Desktop-App** (Windows 10/11) | alle, die einfach loslegen wollen | `TERRA-Sim-…-Setup.exe` aus den [Releases](https://github.com/Jade-HS-Vibecoding-WPK/TERRA-Sim/releases/latest) laden und installieren (ohne Administratorrechte) – oder die portable ZIP entpacken und `TERRA-Sim.exe` starten |
+| **Live-Demo im Browser** | zum Reinschauen, ohne Installation | [jade-hs-vibecoding-wpk.github.io/TERRA-Sim](https://jade-hs-vibecoding-wpk.github.io/TERRA-Sim/) – Beispielgebiet, vorberechnet |
+| **Aus dem Quellcode** (jedes Betriebssystem) | zum Mitentwickeln und für eigene Module | siehe [Schnellstart](#-schnellstart): `pip install -r requirements.txt`, dann `streamlit run app.py` |
+
+Die Desktop-App ist dasselbe Streamlit-Werkzeug, mit Python verpackt: Ein kleiner Starter
+startet den Server nur auf diesem Rechner (127.0.0.1) und öffnet TERRA-Sim in einem eigenen
+Fenster (Microsoft Edge oder Chrome im App-Modus, sonst im Standard-Browser). Schließt man
+das Fenster, endet auch der Server. Zwischenspeicher und Protokolle liegen unter
+`%LOCALAPPDATA%\TERRA-Sim`. Weil das Programm nicht signiert ist, warnt Windows SmartScreen
+beim ersten Start – **Weitere Informationen → Trotzdem ausführen**.
+
 ---
 
 ## 🎯 Über das Projekt
@@ -175,6 +192,7 @@ terra-sim/
 ├── assets/                    # Logo, Icon und CSS-Styling
 ├── tests/                     # ✅ Tests (offline, pytest) – siehe „Tests“
 ├── demo/                      # 🌐 Live-Demo für GitHub Pages (index.html, demo.js, demo.css, data/)
+├── desktop/                   # 🖥️ Desktop-App: Starter, PyInstaller, Installer, Release-Notizen
 └── scripts/
     ├── build_demo.py          # rechnet das Demo-Gebiet mit dem echten Code durch → demo/data/
     └── assemble_demo.sh       # baut demo/ + 3D-Viewer zur statischen Seite zusammen
@@ -252,6 +270,20 @@ python -m http.server 8510 --directory .cache/site
 
 Nach einem Push auf `main` veröffentlicht der Workflow
 `.github/workflows/pages.yml` die Demo automatisch.
+
+### Desktop-App bauen und veröffentlichen
+
+```bash
+pip install -r requirements-dev.txt pyinstaller
+python desktop/make_icon.py                       # Programmsymbol aus dem Logo
+pyinstaller desktop/terra-sim.spec --noconfirm    # -> dist/TERRA-Sim/TERRA-Sim.exe
+dist/TERRA-Sim/TERRA-Sim.exe --selftest bericht.txt   # ist alles im Programm enthalten?
+```
+
+Den Installer baut Inno Setup (`desktop/installer.iss`). Beides erledigt der Workflow
+`.github/workflows/release.yml`: Ein Tag wie `v1.0` baut das Programm unter Windows, prüft
+es (Tests, Selbsttest, Server-Start) und hängt Installer und portable ZIP an ein
+GitHub-Release. Die Versionsnummer steht in `modules/version.py`.
 
 ---
 

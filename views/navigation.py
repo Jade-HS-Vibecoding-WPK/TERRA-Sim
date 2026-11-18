@@ -13,6 +13,7 @@ import html
 import streamlit as st
 
 from modules.map_selector import bbox_size_m
+from modules.version import __version__
 from views.common import get_model, num, project_file
 
 PAGES: dict = {}
@@ -118,7 +119,7 @@ def sidebar():
         current = get_model()
         terrain = (current.dem.attribution or current.dem.source) if current else \
             "DGM1 der Länder / Open-Elevation / Open-Meteo"
-        st.caption(f"Daten: © OpenStreetMap-Mitwirkende · Gelände: {terrain} · Meteostat · "
+        st.caption(f"TERRA-Sim {__version__} · Daten: © OpenStreetMap-Mitwirkende · Gelände: {terrain} · Meteostat · "
                    "Datenbasis: Deutscher Wetterdienst (KOSTRA-DWD-2020, Wind- und Böenmessungen) · "
                    "Hochwassergefahrenkarten der Länder (BfG-Geoportal) · Erdbebenzonen: GFZ Potsdam. "
                    "Heuristische Ersteinschätzung, kein Gutachten.")
