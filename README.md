@@ -173,6 +173,7 @@ terra-sim/
 │   └── earthquake.py · tornado.py · kaiju.py · alien.py   # weitere Katastrophen
 │
 ├── assets/                    # Logo, Icon und CSS-Styling
+├── tests/                     # ✅ Tests (offline, pytest) – siehe „Tests“
 ├── demo/                      # 🌐 Live-Demo für GitHub Pages (index.html, demo.js, demo.css, data/)
 └── scripts/
     ├── build_demo.py          # rechnet das Demo-Gebiet mit dem echten Code durch → demo/data/
@@ -209,6 +210,25 @@ Seitenleiste zwischen Übersicht, Klima, 3D-Modell und den Analysen wechseln.
 > Ein Neuladen der Browserseite beendet die Sitzung. Mit **Speichern** in der
 > Seitenleiste lässt sich das Projekt als Datei sichern und später über den
 > Reiter **Projektdatei** wieder öffnen.
+
+### Tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+Die Tests brauchen **kein Netz**: `tests/fixtures.py` baut ein Testgebiet aus
+synthetischen OSM-Rohdaten (durch den echten Parser), einem Gelände mit Mulde
+und festen Werten statt der amtlichen Dienste.
+
+* `test_likelihood.py` – Wiederkehrzeiten, Gumbel, KOSTRA-Interpolation, Erdbebenzonen, Tornado, Kaiju
+* `test_hazards.py` – Erdbeben nach Lagomarsino & Giovinazzi, Wald et al., Rankine-Wirbel
+* `test_simulator.py` – Hochwasser, Massenbilanz beim Starkregen, Winddruck nach Eurocode, Windfeld
+* `test_methods.py` – Quellen vollständig, BibTeX gültig, **Rechenwege in `methods.py` passen zu den Konstanten im Code**
+* `test_app_smoke.py` – jede Seite der App läuft mit Streamlits `AppTest` ohne Fehler durch
+
+Der Workflow `.github/workflows/tests.yml` führt sie bei jedem Push und Pull Request aus.
 
 ### Live-Demo auf GitHub Pages
 
