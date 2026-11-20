@@ -71,10 +71,13 @@ function oddsCard(key, explain) {
   if (o.T == null) {
     body = `<p>${esc(o.text || 'Für dieses Szenario liegen keine Daten zur Häufigkeit vor.')}</p>`;
   } else {
-    const tiny = o.p_life < 0.001;
+    // winzige Chancen (Kaiju, Aliens): „1 zu …“ groß, die lange Prozentzahl darunter (wie in der App)
+    const chance = o.p_life < 1e-6
+      ? [o.one_in, `also ${o.life}; pro Jahr ${o.year}`]
+      : [o.life, (o.p_life < 0.001 ? `also ${o.one_in}` : 'mindestens einmal') + `; pro Jahr ${o.year}`];
     body = factsHtml([
       ['Wie oft?', o.text, 'im Mittel – nicht „genau alle …“'],
-      [`Chance in ${years} Jahren`, o.life, (tiny ? `also ${o.one_in}` : 'mindestens einmal') + `; pro Jahr ${o.year}`],
+      [`Chance in ${years} Jahren`, ...chance],
     ]);
   }
   const note = [explain, o.source ? `Quelle: ${o.source}.` : ''].filter(Boolean).join(' ');

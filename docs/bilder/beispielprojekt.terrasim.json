@@ -1,0 +1,42 @@
+{
+  "terra_sim_project": 1,
+  "name": "Oldenburg Innenstadt",
+  "bbox": [
+    8.210256,
+    53.137754,
+    8.217744,
+    53.142246
+  ],
+  "settings": {
+    "flood_gauge": 2.0,
+    "flood_ref": "Tiefster Geländepunkt im Gebiet",
+    "rain_scenario": "Jahrhundertregen (100 l/m²)",
+    "rain_display": "Risiko-Index",
+    "wind_dir": 225,
+    "wind_bft": 10,
+    "model_lod": "LOD 2 – mit Dachformen",
+    "model_color": "Gebäudehöhe",
+    "rain_sewer": 20,
+    "rain_duration": "24 Stunden",
+    "flood_official": false,
+    "quake_mw": 6.0,
+    "quake_dist_km": 10,
+    "quake_soil": "Mittel (Kies, fester Lehm)",
+    "tornado_ef": 3,
+    "tornado_heading": 60,
+    "tornado_offset": 0,
+    "kaiju_height": 80,
+    "kaiju_heading": 90,
+    "kaiju_offset": 0,
+    "kaiju_lasers": 8,
+    "kaiju_helis": 5,
+    "people_count": 400,
+    "wind_ground": "Wind in Fußgängerhöhe",
+    "wind_flow": true,
+    "wind_arrow": true,
+    "wind_rose": true,
+    "alien_ufos": 1,
+    "alien_size": 80,
+    "alien_height": 120
+  }
+}
