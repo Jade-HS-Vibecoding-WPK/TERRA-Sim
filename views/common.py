@@ -926,12 +926,17 @@ def odds_card(model: Model, key: str, explain: str = ""):
                        if odds else "Für dieses Szenario liegen keine Daten zur Häufigkeit vor.")
             return
         from modules.likelihood import one_in
-        tiny = odds["p_life"] < 0.001
+        p_life = odds["p_life"]
+        if p_life < 1e-6:
+            # Winzige Chancen (Kaiju, Aliens): „1 zu …“ groß – die lange Prozentzahl würde mitten in
+            # den Ziffern umbrechen und sich wie zwei Angaben lesen; sie steht darunter.
+            chance = (one_in(p_life), f"also {percent(p_life)}; pro Jahr {percent(odds['p_year'])}")
+        else:
+            chance = (percent(p_life), (f"also {one_in(p_life)}" if p_life < 0.001 else "mindestens einmal")
+                      + f"; pro Jahr {percent(odds['p_year'])}")
         st.html(facts_html([
             ("Wie oft?", odds["text"], "im Mittel – nicht „genau alle …“"),
-            (f"Chance in {LIFETIME_YEARS} Jahren", percent(odds["p_life"]),
-             (f"also {one_in(odds['p_life'])}" if tiny else "mindestens einmal")
-             + f"; pro Jahr {percent(odds['p_year'])}"),
+            (f"Chance in {LIFETIME_YEARS} Jahren", *chance),
         ]))
         if explain or source:
             st.caption(" ".join(t for t in (explain, f"Quelle: {source}." if source else "") if t))

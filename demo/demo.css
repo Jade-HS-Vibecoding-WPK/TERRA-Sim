@@ -137,6 +137,7 @@ main { max-width: 1200px; margin: 0 auto; }
 .terra-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: .8rem 1.4rem; margin: .15rem 0 .35rem; }
 .terra-fact .lbl { font-size: .84rem; color: var(--muted); }
+.terra-fact { min-width: 0; }
 .terra-fact .val { font-size: 1.7rem; font-weight: 800; line-height: 1.15; color: var(--g-900);
   margin: .12rem 0 .1rem; overflow-wrap: break-word; }
 .terra-fact .note { font-size: .78rem; color: var(--muted); line-height: 1.3; }
